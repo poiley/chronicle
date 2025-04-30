@@ -1,0 +1,68 @@
+# S3 bucket for uploads
+resource "aws_s3_bucket" "streams" {
+  bucket = var.bucket_name
+
+  lifecycle_rule {
+    id      = "expire-old-objects"
+    enabled = true
+    expiration { days = 30 }
+  }
+}
+
+# ECR repository
+resource "aws_ecr_repository" "grabber" {
+  name = var.ecr_repo_name
+}
+
+# CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "grabber" {
+  name              = "/ecs/${var.task_family}"
+  retention_in_days = 14
+}
+
+# ECS Cluster
+resource "aws_ecs_cluster" "this" {
+  name = var.cluster_name
+}
+
+# ECS Task Definition
+resource "aws_ecs_task_definition" "grabber" {
+  family                   = var.task_family
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.cpu
+  memory                   = var.memory
+  execution_role_arn       = aws_iam_role.ecs_exec_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  container_definitions = jsonencode([
+    {
+      name        = var.container_name
+      image       = "${aws_ecr_repository.grabber.repository_url}:latest"
+      essential   = true
+      entryPoint  = ["/app/entrypoint.sh"]
+      command     = []
+
+      # **NEW**: tell the container which table to hit and how long to keep records
+      environment = [
+        {
+          name  = "DDB_TABLE"
+          value = aws_dynamodb_table.jobs.name
+        },
+        {
+          name  = "TTL_DAYS"
+          value = "30"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.grabber.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = var.container_name
+        }
+      }
+    }
+  ])
+}

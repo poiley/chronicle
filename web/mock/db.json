@@ -1,0 +1,17 @@
+{
+    "jobs": [
+      {
+        "jobId": "1111-2222-3333-4444",
+        "url": "https://youtu.be/VIDEO_ID",
+        "filename": "sample.mkv",
+        "s3Key": "recordings/2025/04/29/sample.mkv",
+        "status": "RECORDING",
+        "createdAt": "2025-04-29T10:00:00Z",
+        "startedAt": "2025-04-29T10:01:00Z",
+        "recordingAt": "2025-04-29T10:02:00Z",
+        "lastHeartbeat": "2025-04-29T10:03:00Z",
+        "bytesDownloaded": 12345678
+      }
+    ]
+  }
+  
