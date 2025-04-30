@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir yt-dlp
 WORKDIR /app
 
 # Copy entrypoint (which now includes stream download logic)
-COPY entrypoint.sh /app/entrypoint.sh
+COPY docker/ecs/entrypoint.sh /app/entrypoint.sh
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh
