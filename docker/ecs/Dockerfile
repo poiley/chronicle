@@ -1,11 +1,20 @@
 # Use a slim Python base with bash
 FROM python:3.11-slim
 
-# Install ffmpeg (for segment merge) and curl
+# Set AWS configuration environment variables
+ENV AWS_REGION="us-west-1"
+ENV AWS_DEFAULT_REGION="us-west-1"
+
+# Install ffmpeg, curl, unzip
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ffmpeg curl \
+       ffmpeg curl unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+RUN unzip awscliv2.zip
+RUN ./aws/install
 
 # Install yt-dlp
 RUN pip install --no-cache-dir yt-dlp
@@ -14,7 +23,7 @@ RUN pip install --no-cache-dir yt-dlp
 WORKDIR /app
 
 # Copy entrypoint (which now includes stream download logic)
-COPY docker/ecs/entrypoint.sh /app/entrypoint.sh
+COPY entrypoint.sh /app/entrypoint.sh
 
 # Make entrypoint executable
 RUN chmod +x /app/entrypoint.sh

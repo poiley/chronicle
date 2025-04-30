@@ -43,7 +43,6 @@ resource "aws_ecs_task_definition" "grabber" {
       entryPoint  = ["/app/entrypoint.sh"]
       command     = []
 
-      # **NEW**: tell the container which table to hit and how long to keep records
       environment = [
         {
           name  = "DDB_TABLE"

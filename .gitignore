@@ -77,3 +77,4 @@ aws_config
 # Miscellaneous
 #--------------------------------------
 coverage/
+*.zip

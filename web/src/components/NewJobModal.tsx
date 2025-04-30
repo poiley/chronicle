@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { createJob } from "../lib/api";
 import { Job } from "../types/job";
-import { Input }     from "@/components/ui/input";
-import { Button }   from "@/components/ui/button";
-import { Label }    from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 
 type NewJobModalProps = {

@@ -13,6 +13,7 @@ resource "aws_lambda_function" "dispatch" {
   handler          = "dispatch_to_ecs.lambda_handler"
   runtime          = "python3.9"
   role             = aws_iam_role.lambda_exec_role.arn
+  timeout          = 300
 
   environment {
     variables = {
