@@ -8,7 +8,7 @@ const POLL_INTERVAL = parseInt(process.env.NEXT_PUBLIC_POLL_INTERVAL || "5000", 
  * Fetch the list of jobs.
  */
 export async function listJobs(): Promise<Job[]> {
-  const res = await axios.get<Job[]>(`${API_URL}/jobs`);
+  const res = await axios.get<Job[]>(`${API_URL}?path=/jobs`);
   return res.data;
 }
 
@@ -16,7 +16,7 @@ export async function listJobs(): Promise<Job[]> {
  * Fetch a single job by ID.
  */
 export async function getJob(jobId: string): Promise<Job> {
-  const res = await axios.get<Job>(`${API_URL}/jobs/${jobId}`);
+  const res = await axios.get<Job>(`${API_URL}?path=/jobs/${jobId}`);
   return res.data;
 }
 
@@ -26,7 +26,7 @@ export async function getJob(jobId: string): Promise<Job> {
 export async function createJob(url: string, filename: string): Promise<Job> {
   // generate a client-side UUID
   const jobId = crypto.randomUUID();
-  await axios.post(`${API_URL}/jobs`, {
+  await axios.post(`${API_URL}?path=/jobs`, {
     jobId,
     url,
     filename,

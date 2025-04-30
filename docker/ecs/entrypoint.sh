@@ -4,10 +4,10 @@ set -euo pipefail
 # If AWS_ENDPOINT_URL is defined (LocalStack), include it on every aws call
 # Additionally, set up AWS credentials for localstack run
 if [[ -n "${AWS_ENDPOINT_URL:-}" ]]; then
-  export AWS_ENDPOINT_URL="http://localstack:4566"
   export AWS_ACCESS_KEY_ID="test"
   export AWS_SECRET_ACCESS_KEY="test"
-  AWS_CLI="aws --endpoint-url $AWS_ENDPOINT_URL"
+  export AWS_REGION="us-east-1"
+  AWS_CLI="aws --endpoint-url $AWS_ENDPOINT_URL --region $AWS_REGION"
 else
   AWS_CLI="aws"
 fi
@@ -18,7 +18,6 @@ fi
 #   S3_BUCKET  — target S3 bucket
 #   S3_KEY     — target S3 key prefix
 #   TTL_DAYS   — record TTL in days
-
 URL="$1"
 OUTFILE="$2"
 TARGET="/downloads/${OUTFILE%.*}.mkv"
@@ -42,14 +41,21 @@ ddb_update(){
   fi
   json+="}"
 
-  # debug-log for sanity
-  echo "DEBUG ddb_update → expr_suffix=[$expr_suffix] json=[$json]" >&2
+  # Replace any reserved words with expression attribute names
+  # Convert "ttl = :ttl" to "#ttl = :ttl" in expr_suffix
+  expr_suffix="${expr_suffix//ttl = /#ttl = }"
+  
+  # Add ttl to attribute names if needed
+  local attr_names='{"#s":"status"}'
+  if [[ "$expr_suffix" == *"#ttl"* ]]; then
+    attr_names='{"#s":"status","#ttl":"ttl"}'
+  fi
 
   $AWS_CLI dynamodb update-item \
     --table-name "$DDB_TABLE" \
     --key "{\"jobId\":{\"S\":\"$JOB_ID\"}}" \
     --update-expression "SET #s = :s${expr_suffix}" \
-    --expression-attribute-names '{"#s":"status"}' \
+    --expression-attribute-names "$attr_names" \
     --expression-attribute-values "$json"
 }
 

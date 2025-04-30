@@ -12,12 +12,6 @@ A turnkey, serverless system for on-demand recording of YouTube Live streams. Su
 
 ## Architecture Overview
 
-```text
-[ Client (SPA) ] ─▶ S3/CF (UI) ─▶ API Gateway ─▶ Lambda (dispatch_to_ecs) ─▶ SQS FIFO ─▶ Lambda ─▶ ECS Task (yt-dlp) ─▶ S3
-                                 │                                     │
-                                 └──────────▶ DynamoDB (jobs table) ◀──┘
-```
-
 ```mermaid
 flowchart LR
   subgraph Frontend
@@ -59,7 +53,7 @@ flowchart LR
 
 ---
 
-## Development Setup
+## Production Deployment
 
 ### 1. Backend (terraform/backend)
 
@@ -92,7 +86,13 @@ terraform apply
 
 Capture the S3 bucket name and CloudFront domain from the outputs.
 
-### 3. Local Web Development (web/)
+### 3. Local Development 
+
+#### 3.1 Backend (`localstack`)
+
+
+
+#### 3.2 Frontend (`web/`)
 
 1. Install dependencies:
    ```bash

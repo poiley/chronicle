@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import time
-
+import datetime
 import boto3
 
 # Configure root logger
@@ -34,6 +34,11 @@ ttl_days       = int(os.environ.get("TTL_DAYS", "30"))
 
 
 def lambda_handler(event, context):
+    # Check if event is from API Gateway
+    if event.get('httpMethod'):
+        return handle_api_request(event, context)
+    # Otherwise handle SQS event as before
+    
     # startup log
     logger.info("START handler; event: %s", json.dumps(event))
     logger.info("ENDPOINT_URL: %s", os.environ.get("AWS_ENDPOINT_URL"))
@@ -69,8 +74,9 @@ def lambda_handler(event, context):
             "url":       url,
             "filename":  filename,
             "s3Key":     s3_key,
-            "status":    "STARTING",
+            "status":    "STARTED",
             "createdAt": now,
+            "startedAt": now,
             "ttl":       now + ttl_days * 86400,
         })
 
@@ -87,7 +93,7 @@ def lambda_handler(event, context):
                 container = client.containers.run(
                     image=container_name,
                     command=[url, filename],
-                    network="localstack_default"
+                    network="localstack_default",
                     volumes={
                         "/var/run/docker.sock": {
                             "bind": "/var/run/docker.sock",
@@ -167,11 +173,14 @@ def lambda_handler(event, context):
             # mark success
             table.update_item(
                 Key={"jobId": job_id},
-                UpdateExpression="SET #st = :s, finishedAt = :f",
-                ExpressionAttributeNames={"#st": "status"},
+                UpdateExpression="SET #st = :s, #ttl = :t",
+                ExpressionAttributeNames={
+                    "#st": "status",
+                    "#ttl": "ttl"
+                },
                 ExpressionAttributeValues={
                     ":s": "COMPLETED",
-                    ":f": int(time.time())
+                    ":t": datetime.datetime.now().isoformat() + "Z"
                 },
             )
 
@@ -192,3 +201,44 @@ def lambda_handler(event, context):
             raise
 
     return {"status": "processed"}
+
+
+def handle_api_request(event, context):
+    http_method = event['httpMethod']
+    path = event.get('path', '')
+    
+    # GET /jobs - List all jobs
+    if http_method == 'GET' and path == '/jobs':
+        # Query DynamoDB for all jobs
+        result = table.scan()
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps(result.get('Items', []))
+        }
+    
+    # POST /jobs - Create new job
+    if http_method == 'POST' and path == '/jobs':
+        body = json.loads(event['body'])
+        job_id = body.get('jobId')
+        url = body.get('url')
+        filename = body.get('filename')
+        
+        # Create SQS message
+        sqs = boto3.client('sqs')
+        sqs.send_message(
+            QueueUrl=os.environ.get('SQS_QUEUE_URL'),
+            MessageBody=json.dumps({
+                'jobId': job_id,
+                'url': url,
+                'filename': filename,
+                's3Key': f"recordings/{datetime.datetime.now().strftime('%Y/%m/%d')}/{filename}"
+            }),
+            MessageGroupId='default'
+        )
+        
+        return {
+            'statusCode': 201,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'success': True})
+        }
