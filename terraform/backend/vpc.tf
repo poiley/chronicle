@@ -65,7 +65,7 @@ resource "aws_security_group" "ecs_tasks" {
   description = "Allow outbound internet access for Fargate"
   vpc_id      = aws_vpc.this.id
 
-  # Ingress: none (you don't need inbound for yt-dlp → pulls)
+  # Ingress: none (none needed inbound for yt-dlp → pulls)
   egress {
     from_port   = 0
     to_port     = 0

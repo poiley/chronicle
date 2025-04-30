@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <YouTube-Live-URL> <output-filename.mkv>"
+  echo "Usage: $0 <URL> <output-filename.mkv>"
   exit 1
 fi
 
@@ -16,11 +16,11 @@ HOST_DOWNLOADS_DIR="/storage/downloads/streams"
 #mkdir -p "$HOST_DOWNLOADS_DIR"
 
 # Build the image if needed
-docker build -t livestream-grabber .
+docker build -t chronicle-recorder .
 
 # Run the container and map the downloads folder
 docker run --rm \
   -v "$HOST_DOWNLOADS_DIR":/downloads \
-  livestream-grabber \
+  chronicle-recorder \
   "$URL" \
   "$OUTFILE"

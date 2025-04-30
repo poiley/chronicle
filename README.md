@@ -1,6 +1,6 @@
-# YouTube Live-Stream Recorder
+# Chronicle: Live-Stream Recorder
 
-A turnkey, serverless system for on-demand recording of YouTube Live streams. Submit a live-URL via a dashboard or CLI, and the system will:
+A turnkey, serverless system for on-demand recording of livestreams. Submit a live-URL via a dashboard or CLI, and the system will:
 
 1. Enqueue your request in an SQS FIFO queue.  
 2. Dispatch a Lambda → ECS Fargate task to record in highest quality (`yt-dlp`).  
@@ -34,13 +34,33 @@ This dual approach provides the best of both worlds: fast, free local developmen
 
 ## DevOps & Operational Considerations
 
-From an operational standpoint, this design emphasizes decoupling, observability, and security. Jobs are first placed in SQS, which guarantees at-least-once delivery and can be monitored or replayed if needed. The Lambda dispatcher validates each YouTube URL before spinning up a Fargate task, preventing wasted compute on non-existent streams. Real-time status—including precise "started," "recording," "uploading," and "completed" milestones—is persisted in DynamoDB, along with periodic heartbeats and byte counts, giving you a granular view of in-flight recordings.
+From an operational standpoint, this design emphasizes decoupling, observability, and security. Jobs are first placed in SQS, which guarantees at-least-once delivery and can be monitored or replayed if needed. The Lambda dispatcher validates each stream URL before spinning up a Fargate task, preventing wasted compute on non-existent streams. Real-time status—including precise "started," "recording," "uploading," and "completed" milestones—is persisted in DynamoDB, along with periodic heartbeats and byte counts, giving you a granular view of in-flight recordings.
 
 IAM roles follow the principle of least privilege: the ECS task role can only write to its designated S3 bucket and update its DynamoDB record; the Lambda role can only pull from SQS, invoke ECS, and write to DynamoDB. CloudWatch Logs capture both Lambda and container output, and you can configure alarms on error metrics or Lambda failures. A TTL policy on the DynamoDB table ensures old job records expire automatically, and CloudFront serves your static dashboard with minimal latency and cost.
 
 Deployment pipelines should separate concerns: backend infrastructure changes (Terraform in `terraform/backend`) run independently of frontend hosting updates (`terraform/frontend` plus S3 sync and CloudFront invalidation). The static site build (via `util/build-web.sh`) can be integrated into GitHub Actions, which on each merge to `main` will build and deploy the UI, then invalidate CloudFront. Simultaneously, code changes to `entrypoint.sh` or Lambda functions trigger a separate pipeline that builds and pushes a new container image to ECR, followed by a Terraform apply for the backend.
 
 The Docker container handling has been enhanced to work both with ECS in production and with LocalStack locally, using the same entrypoint script. The Lambda function detects the environment and adjusts its behavior accordingly, providing a seamless transition between local and cloud deployments.
+
+---
+
+## Docker Image & ECS Task
+
+The system uses a Docker container for livestream recording that works seamlessly in both production (ECS Fargate) and local (LocalStack) environments.
+
+The `docker/ecs/Dockerfile` installs:
+- Python 3.11 with the latest `yt-dlp`
+- FFmpeg for media processing
+- AWS CLI for S3 uploads and DynamoDB updates
+
+The container's entrypoint script (`entrypoint.sh`) provides:
+1. Environment detection to work with both AWS and LocalStack
+2. DynamoDB status updates throughout the recording lifecycle
+3. Periodic heartbeats with download progress
+4. Error handling with detailed logs
+5. S3 uploading of the final recording
+
+In production, this image is pushed to ECR and referenced in your ECS task definition for Fargate. For local development, the Lambda function in LocalStack can spawn this container directly via the Docker socket.
 
 ---
 
@@ -59,7 +79,7 @@ flowchart LR
     DB[DynamoDB Jobs Table]
     Q[SQS FIFO Queue]
     L2[Lambda sqs handler]
-    ECS[ECS Fargate yt dlp Task]
+    ECS[ECS Fargate Chronicle Recorder Task]
     S3[S3 Bucket Recordings]
   end
 
@@ -95,7 +115,7 @@ flowchart LR
 - **`terraform/backend/`**: VPC, subnets, ECS cluster & task definition, IAM roles, SQS FIFO + DLQ, Lambda dispatcher, DynamoDB jobs table, API Gateway REST API.  
 - **`terraform/frontend/`**: S3 bucket + OAI, CloudFront distribution with HTTPS (ACM), optional Route53 for custom domain.  
 - **`web/`**: Next.js + TypeScript + Tailwind + shadcn UI SPA that polls job status every 5 s, displays cards, and offers an inline modal to submit new jobs.  
-- **`util/`**: Helper scripts (`build-web.sh`, `add_to_queue.sh`, `dl-strm.sh`) for building the static site, enqueuing jobs, and local stream grabs.
+- **`util/`**: Helper scripts (`build-web.sh`, `add_to_queue.sh`, `dl-strm.sh`) for building the static site, enqueuing jobs, and local stream recordings.
 - **`docker/localstack/`**: Configuration files and scripts for running AWS services locally with LocalStack.
 
 ---
@@ -167,9 +187,9 @@ LocalStack provides a fully functional local AWS cloud stack that allows you to 
    ./localstack_setup.sh
    ```
    This script performs the following setup tasks:
-   - Creates an S3 bucket for recordings (`yt-stream-grabs-dev`)
+   - Creates an S3 bucket for recordings (`chronicle-recordings-dev`)
    - Creates a DynamoDB table for job tracking (`jobs`) with TTL enabled
-   - Sets up SQS FIFO queue (`yt-jobs.fifo`) and DLQ (`yt-jobs-dlq.fifo`)
+   - Sets up SQS FIFO queue (`chronicle-jobs.fifo`) and DLQ (`chronicle-jobs-dlq.fifo`)
    - Packages and deploys the Lambda function (`dispatch-to-ecs`)
    - Configures API Gateway with `/jobs` endpoint supporting GET and POST methods
    - Sets up SQS event source mapping for the Lambda
@@ -237,8 +257,8 @@ The project includes several utility scripts to simplify common development and 
 - **build_web.sh**: Installs dependencies, builds, and exports the Next.js app into `web/out/` for deployment to S3.  
 - **add_to_queue.sh**: Enqueues a new recording job by:
   ```bash
-  # Format: add_to_queue.sh <QUEUE_URL> <YOUTUBE_URL> [FILENAME] [S3_PREFIX]
-  ./util/add_to_queue.sh "https://sqs.us-east-1.amazonaws.com/123456789012/yt-jobs.fifo" "https://www.youtube.com/watch?v=LIVE_ID" "my-recording.mkv"
+  # Format: add_to_queue.sh <QUEUE_URL> <STREAM_URL> [FILENAME] [S3_PREFIX]
+  ./util/add_to_queue.sh "https://sqs.us-east-1.amazonaws.com/000000000000/chronicle-jobs.fifo" "https://www.youtube.com/watch?v=LIVE_ID" "my-recording.mkv"
   ```
   This generates a UUID for the job, computes the S3 key, and sends the message to SQS FIFO.
   
@@ -259,7 +279,7 @@ The project includes several utility scripts to simplify common development and 
   2. Rebuilds the environment from scratch
   3. Enqueues a test job to verify functionality
 
-- **dl-strm.sh**: Legacy local stream grabber using `yt-dlp` directly:
+- **dl-strm.sh**: Legacy local stream recorder using `yt-dlp` directly:
   ```bash
   ./util/dl-strm.sh "https://www.youtube.com/watch?v=LIVE_ID"
   ```

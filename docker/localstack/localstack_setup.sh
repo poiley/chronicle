@@ -29,14 +29,14 @@ done
 echo "✅ LocalStack is up!"
 
 # Configuration (override via env if desired)
-S3_BUCKET="${S3_BUCKET:-yt-stream-grabs-${ENVIRONMENT}}"
+S3_BUCKET="${S3_BUCKET:-chronicle-recordings-${ENVIRONMENT}}"
 DDB_TABLE=${DDB_TABLE:-jobs}
-QUEUE_NAME=${QUEUE_NAME:-yt-jobs.fifo}
-DLQ_NAME=${DLQ_NAME:-yt-jobs-dlq.fifo}
+QUEUE_NAME=${QUEUE_NAME:-chronicle-jobs.fifo}
+DLQ_NAME=${DLQ_NAME:-chronicle-jobs-dlq.fifo}
 LAMBDA_NAME=${LAMBDA_NAME:-dispatch-to-ecs}
 LAMBDA_SRC_DIR="terraform/backend/lambda"
 LAMBDA_ZIP="${LAMBDA_SRC_DIR}/dispatch_to_ecs.zip"
-API_NAME=${API_NAME:-yt-api}
+API_NAME=${API_NAME:-chronicle-api}
 ECS_CLUSTER=${ECS_CLUSTER:-local-cluster}
 
 # 1) Package the Lambda if missing
@@ -120,7 +120,7 @@ else
     --role arn:aws:iam::000000000000:role/irrelevant \
     --zip-file fileb://"$LAMBDA_ZIP" \
     --timeout 300 \
-    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=yt-grabber-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=yt-grabber,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30}"
+    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=chronicle-recorder-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=chronicle-recorder,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30}"
 fi
 
 # 6) API Gateway

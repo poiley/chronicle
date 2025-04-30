@@ -42,7 +42,7 @@ export function NewJobModal({ onJobCreated }: NewJobModalProps) {
             <h2 className="text-lg font-semibold mb-4">Submit New Job</h2>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <Label htmlFor="url">YouTube Live URL</Label>
+                <Label htmlFor="url">Livestream URL</Label>
                 <Input
                   id="url"
                   type="url"

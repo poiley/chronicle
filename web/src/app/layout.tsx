@@ -2,8 +2,8 @@ import "../styles/globals.css";
 import React from "react";
 
 export const metadata = {
-  title: "YouTube Live Recorder Dashboard",
-  description: "Monitor and submit YouTube Live recording jobs",
+  title: "chronicle",
+  description: "Monitor and submit livestream recording jobs",
 };
 
 export default function RootLayout({

@@ -14,7 +14,6 @@ services:
       - LAMBDA_EXECUTOR=docker
       - DOCKER_HOST=unix:///var/run/docker.sock
       - LAMBDA_DOCKER_FLAGS=--user root:root -v /var/run/docker.sock:/var/run/docker.sock:rw
-      - LAMBDA_PROVIDER=lambda-v2
     volumes:
       - localstack_data:/data
       - /var/run/docker.sock:/var/run/docker.sock

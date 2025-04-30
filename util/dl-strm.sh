@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
-  echo "Usage: $0 <YouTube-Live-URL>"
+  echo "Usage: $0 <URL>"
   exit 1
 fi
 

@@ -19,7 +19,7 @@ resource "aws_lambda_function" "dispatch" {
     variables = {
       # ECS & S3 settings
       ECS_CLUSTER    = aws_ecs_cluster.this.name
-      ECS_TASK_DEF   = aws_ecs_task_definition.grabber.arn
+      ECS_TASK_DEF   = aws_ecs_task_definition.recorder.arn
       S3_BUCKET      = aws_s3_bucket.streams.bucket
       CONTAINER_NAME = var.container_name
       DDB_TABLE      = aws_dynamodb_table.jobs.name
@@ -33,7 +33,7 @@ resource "aws_lambda_function" "dispatch" {
 
 # Event source mapping from FIFO SQS → this Lambda
 resource "aws_lambda_event_source_mapping" "sqs_dispatch" {
-  event_source_arn = aws_sqs_queue.yt_jobs.arn
+  event_source_arn = aws_sqs_queue.chronicle_jobs.arn
   function_name    = aws_lambda_function.dispatch.arn
   batch_size       = 1
   enabled          = true

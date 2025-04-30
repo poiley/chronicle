@@ -13,31 +13,31 @@ variable "environment" {
 variable "bucket_name" {
   description = "S3 bucket to store completed recordings"
   type        = string
-  default     = "yt-stream-grabs-prod"
+  default     = "chronicle-recordings-prod"
 }
 
 variable "ecr_repo_name" {
-  description = "Name of the ECR repository for the grabber image"
+  description = "Name of the ECR repository for the recorder image"
   type        = string
-  default     = "yt-grabber"
+  default     = "chronicle-recorder"
 }
 
 variable "cluster_name" {
   description = "ECS cluster name"
   type        = string
-  default     = "yt-grabber-cluster"
+  default     = "chronicle-cluster"
 }
 
 variable "task_family" {
   description = "ECS task definition family"
   type        = string
-  default     = "yt-grabber-task"
+  default     = "chronicle-recorder-task"
 }
 
 variable "container_name" {
   description = "Name of the container inside the task"
   type        = string
-  default     = "yt-grabber"
+  default     = "chronicle-recorder"
 }
 
 variable "cpu" {

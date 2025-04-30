@@ -1,4 +1,4 @@
 docker build \
-  -t yt-grabber:latest \
+  -t chronicle-recorder:latest \
   -f docker/ecs/Dockerfile \
   docker/ecs

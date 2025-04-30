@@ -93,7 +93,7 @@ data "aws_iam_policy_document" "lambda_ecs" {
       "iam:PassRole"
     ]
     resources = [
-      aws_ecs_task_definition.grabber.arn,
+      aws_ecs_task_definition.recorder.arn,
       aws_iam_role.ecs_exec_role.arn,
       aws_iam_role.ecs_task_role.arn
     ]

@@ -10,12 +10,12 @@ resource "aws_s3_bucket" "streams" {
 }
 
 # ECR repository
-resource "aws_ecr_repository" "grabber" {
+resource "aws_ecr_repository" "recorder" {
   name = var.ecr_repo_name
 }
 
 # CloudWatch Log Group
-resource "aws_cloudwatch_log_group" "grabber" {
+resource "aws_cloudwatch_log_group" "recorder" {
   name              = "/ecs/${var.task_family}"
   retention_in_days = 14
 }
@@ -26,7 +26,7 @@ resource "aws_ecs_cluster" "this" {
 }
 
 # ECS Task Definition
-resource "aws_ecs_task_definition" "grabber" {
+resource "aws_ecs_task_definition" "recorder" {
   family                   = var.task_family
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
@@ -38,7 +38,7 @@ resource "aws_ecs_task_definition" "grabber" {
   container_definitions = jsonencode([
     {
       name        = var.container_name
-      image       = "${aws_ecr_repository.grabber.repository_url}:latest"
+      image       = "${aws_ecr_repository.recorder.repository_url}:latest"
       essential   = true
       entryPoint  = ["/app/entrypoint.sh"]
       command     = []
@@ -57,7 +57,7 @@ resource "aws_ecs_task_definition" "grabber" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = aws_cloudwatch_log_group.grabber.name
+          awslogs-group         = aws_cloudwatch_log_group.recorder.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = var.container_name
         }

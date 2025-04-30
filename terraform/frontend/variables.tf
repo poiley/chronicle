@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region for S3 bucket (e.g. us-west-2)"
   type        = string
-  default     = "us-west-2"
+  default     = "us-west-1"
 }
 
 variable "environment" {
@@ -13,7 +13,7 @@ variable "environment" {
 variable "bucket_name" {
   description = "Name for the S3 bucket to host the site"
   type        = string
-  default     = "yt-grabber-web-${var.environment}"
+  default     = "chronicle-web-${var.environment}"
 }
 
 variable "acm_certificate_arn" {

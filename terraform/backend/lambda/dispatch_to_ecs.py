@@ -121,7 +121,7 @@ def lambda_handler(event, context):
                 exit_code = result.get("StatusCode", -1)
 
                 logs = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
-                logger.info("=== yt-grabber container logs start ===\n%s\n=== yt-grabber container logs end ===", logs)
+                logger.info("=== chronicle-recorder container logs start ===\n%s\n=== chronicle-recorder container logs end ===", logs)
 
 
                 if exit_code != 0:

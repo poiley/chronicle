@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ $# -lt 2 ]; then
-  echo "Usage: $0 <SQS_QUEUE_URL> <YouTube-Live-URL> <output-filename.mkv> [s3-key-prefix]" >&2
+  echo "Usage: $0 <SQS_QUEUE_URL> <URL> <output-filename.mkv> [s3-key-prefix]" >&2
   exit 1
 fi
 
