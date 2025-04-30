@@ -1,4 +1,3 @@
-```markdown
 # YouTube Live-Stream Recorder
 
 A turnkey, serverless system for on-demand recording of YouTube Live streams. Submit a live-URL via a dashboard or CLI, and the system will:
@@ -146,5 +145,3 @@ From an operational standpoint, this design emphasizes decoupling, observability
 IAM roles follow the principle of least privilege: the ECS task role can only write to its designated S3 bucket and update its DynamoDB record; the Lambda role can only pull from SQS, invoke ECS, and write to DynamoDB. CloudWatch Logs capture both Lambda and container output, and you can configure alarms on error metrics or Lambda failures. A TTL policy on the DynamoDB table ensures old job records expire automatically, and CloudFront serves your static dashboard with minimal latency and cost.
 
 Deployment pipelines should separate concerns: backend infrastructure changes (Terraform in `terraform/backend`) run independently of frontend hosting updates (`terraform/frontend` plus S3 sync and CloudFront invalidation). The static site build (via `util/build-web.sh`) can be integrated into GitHub Actions, which on each merge to `main` will build and deploy the UI, then invalidate CloudFront. Simultaneously, code changes to `entrypoint.sh` or Lambda functions trigger a separate pipeline that builds and pushes a new container image to ECR, followed by a Terraform apply for the backend.
-
-This one-pager should guide both developers and DevOps engineers through setup, local development, and production deployment, while preserving a robust, secure, and observable architecture for on-demand YouTube Live recording.
