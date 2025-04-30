@@ -5,6 +5,7 @@ set -euo pipefail
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_REGION=${AWS_REGION:-us-east-1}
+export ENVIRONMENT=${ENVIRONMENT:-dev}
 
 LOCALSTACK_HOST=${LOCALSTACK_HOST:-localhost}
 export AWS_ENDPOINT_URL="http://$LOCALSTACK_HOST:4566"
@@ -28,7 +29,7 @@ done
 echo "✅ LocalStack is up!"
 
 # Configuration (override via env if desired)
-S3_BUCKET=${S3_BUCKET:-yt-stream-grabs-prod}
+S3_BUCKET="${S3_BUCKET:-yt-stream-grabs-${ENVIRONMENT}}"
 DDB_TABLE=${DDB_TABLE:-jobs}
 QUEUE_NAME=${QUEUE_NAME:-yt-jobs.fifo}
 DLQ_NAME=${DLQ_NAME:-yt-jobs-dlq.fifo}
