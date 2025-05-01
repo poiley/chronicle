@@ -1,0 +1,47 @@
+services:
+  # Development service
+  web-dev:
+    build:
+      context: ../..
+      dockerfile: docker/web/Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../web:/app
+      - /app/node_modules
+    environment:
+      # Use direct container name from the connected network
+      - NEXT_PUBLIC_API_URL=http://localstack:4566
+      - NEXT_PUBLIC_POLL_INTERVAL=5000
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - localstack
+
+  # Production service
+  web-prod:
+    build:
+      context: ../..
+      dockerfile: docker/web/Dockerfile
+      target: production
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localstack:4566
+      - NEXT_PUBLIC_POLL_INTERVAL=5000
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - localstack
+
+networks:
+  localstack:
+    external: true
+    name: localstack_default 

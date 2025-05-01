@@ -1,4 +1,4 @@
-# Chronicle: Live-Stream Recorder
+# :floppy_disk: chronicle
 
 A turnkey, serverless system for on-demand recording of livestreams. Submit a live-URL via a dashboard or CLI, and the system will:
 
@@ -62,6 +62,32 @@ The container's entrypoint script (`entrypoint.sh`) provides:
 
 In production, this image is pushed to ECR and referenced in your ECS task definition for Fargate. For local development, the Lambda function in LocalStack can spawn this container directly via the Docker socket.
 
+### Frontend Docker Container
+
+The frontend web application is containerized to simplify development and deployment:
+
+The `docker/web/Dockerfile` provides:
+1. A multi-stage build with development and production targets
+2. Hot reloading for local development
+3. Optimized production builds with Next.js standalone output
+
+**Development Mode**:
+```bash
+# Start the development server with hot reloading
+./util/build_web_docker.sh dev
+```
+
+**Production Mode**:
+```bash
+# Build production image and test locally
+./util/build_web_docker.sh prod run
+
+# Build production image for deployment
+./util/build_web_docker.sh prod push
+```
+
+The production container can be deployed to any container hosting service (ECS, EKS, AppRunner, etc.) or used with a container registry in your CI/CD pipeline.
+
 ---
 
 ## Architecture Overview
@@ -117,6 +143,8 @@ flowchart LR
 - **`web/`**: Next.js + TypeScript + Tailwind + shadcn UI SPA that polls job status every 5 s, displays cards, and offers an inline modal to submit new jobs.  
 - **`util/`**: Helper scripts (`build-web.sh`, `add_to_queue.sh`, `dl-strm.sh`) for building the static site, enqueuing jobs, and local stream recordings.
 - **`docker/localstack/`**: Configuration files and scripts for running AWS services locally with LocalStack.
+- **`docker/web/`**: Docker configuration for frontend development and deployment.
+- **`docker/ecs/`**: Docker configuration for backend stream recording container.
 
 ---
 

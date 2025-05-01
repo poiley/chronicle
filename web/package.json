@@ -7,7 +7,8 @@
     "build": "next build",
     "export": "next export",
     "start": "next start",
-    "mock": "json-server --watch src/mock/db.json --port 3001"
+    "lint": "next lint",
+    "mock": "node src/mock/server.js"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -5,6 +5,7 @@ const nextConfig = {
       appDir: true,
     },
     // No SSR on pages that use `use client`—everything else is static
+    output: 'standalone', // Enable standalone output for Docker deployment
   };
   
   module.exports = nextConfig;

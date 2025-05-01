@@ -159,8 +159,59 @@ for METHOD in GET POST; do
     --source-arn "arn:aws:execute-api:$AWS_REGION:000000000000:$API_ID/*/$METHOD/jobs"
 done
 
-echo "➜ Deploying API to stage 'local'"
-$AWS_CLI apigateway create-deployment --rest-api-id "$API_ID" --stage-name local
+# Enable CORS on the /jobs resource
+echo "➜ Enabling CORS on /jobs resource"
+$AWS_CLI apigateway put-method \
+  --rest-api-id "$API_ID" \
+  --resource-id "$RESOURCE_ID" \
+  --http-method "OPTIONS" \
+  --authorization-type "NONE"
+
+$AWS_CLI apigateway put-integration \
+  --rest-api-id "$API_ID" \
+  --resource-id "$RESOURCE_ID" \
+  --http-method "OPTIONS" \
+  --type "MOCK" \
+  --integration-http-method "OPTIONS" \
+  --request-templates '{"application/json": "{\"statusCode\": 200}"}'
+
+$AWS_CLI apigateway put-method-response \
+  --rest-api-id "$API_ID" \
+  --resource-id "$RESOURCE_ID" \
+  --http-method "OPTIONS" \
+  --status-code "200" \
+  --response-parameters '{
+    "method.response.header.Access-Control-Allow-Headers": true,
+    "method.response.header.Access-Control-Allow-Methods": true,
+    "method.response.header.Access-Control-Allow-Origin": true
+  }'
+
+$AWS_CLI apigateway put-integration-response \
+  --rest-api-id "$API_ID" \
+  --resource-id "$RESOURCE_ID" \
+  --http-method "OPTIONS" \
+  --status-code "200" \
+  --response-parameters '{
+    "method.response.header.Access-Control-Allow-Headers": "'"'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"'",
+    "method.response.header.Access-Control-Allow-Methods": "'"'GET,POST,OPTIONS'"'",
+    "method.response.header.Access-Control-Allow-Origin": "'"'*'"'"
+  }' \
+  --response-templates '{"application/json": ""}'
+
+# Add CORS headers to the existing methods
+for METHOD in GET POST; do
+  $AWS_CLI apigateway put-method-response \
+    --rest-api-id "$API_ID" \
+    --resource-id "$RESOURCE_ID" \
+    --http-method "$METHOD" \
+    --status-code "200" \
+    --response-parameters '{
+      "method.response.header.Access-Control-Allow-Origin": true
+    }'
+done
+
+echo "➜ Deploying API to stage 'prod'"
+$AWS_CLI apigateway create-deployment --rest-api-id "$API_ID" --stage-name prod
 
 # 7) Event source mapping
 echo "-> Creating event source mapping for Lambda"
@@ -174,4 +225,4 @@ echo "▶ S3 Bucket:   $S3_BUCKET"
 echo "▶ Queue URL:   $QUEUE_URL"
 echo "▶ DynamoDB:    $DDB_TABLE"
 echo "▶ Lambda:      $LAMBDA_NAME"
-echo "▶ API URL:     $AWS_ENDPOINT_URL/restapis/$API_ID/local/_user_request_"
+echo "▶ API URL:     $AWS_ENDPOINT_URL/restapis/$API_ID/prod/_user_request_"

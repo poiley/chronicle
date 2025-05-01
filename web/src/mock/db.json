@@ -1,16 +1,41 @@
 {
     "jobs": [
       {
-        "jobId": "1111-2222-3333-4444",
-        "url": "https://youtu.be/VIDEO_ID",
-        "filename": "sample.mkv",
-        "s3Key": "recordings/2025/04/29/sample.mkv",
+        "jobId": "123e4567-e89b-12d3-a456-426614174000",
+        "url": "https://www.youtube.com/watch?v=example1",
+        "filename": "example1.mkv",
+        "status": "COMPLETED",
+        "s3Key": "recordings/2023/05/01/example1.mkv",
+        "createdAt": "2023-05-01T12:00:00Z",
+        "progress": 100,
+        "size": 1024000000
+      },
+      {
+        "jobId": "223e4567-e89b-12d3-a456-426614174001",
+        "url": "https://www.youtube.com/watch?v=example2",
+        "filename": "example2.mkv",
         "status": "RECORDING",
-        "createdAt": "2025-04-29T10:00:00Z",
-        "startedAt": "2025-04-29T10:01:00Z",
-        "recordingAt": "2025-04-29T10:02:00Z",
-        "lastHeartbeat": "2025-04-29T10:03:00Z",
-        "bytesDownloaded": 12345678
+        "s3Key": "recordings/2023/05/02/example2.mkv",
+        "createdAt": "2023-05-02T12:00:00Z",
+        "progress": 45,
+        "lastHeartbeat": "2023-05-02T12:45:00Z"
+      },
+      {
+        "jobId": "323e4567-e89b-12d3-a456-426614174002",
+        "url": "https://www.youtube.com/watch?v=example3",
+        "filename": "example3.mkv",
+        "status": "FAILED",
+        "s3Key": "recordings/2023/05/03/example3.mkv",
+        "createdAt": "2023-05-03T12:00:00Z",
+        "errorMessage": "Stream ended unexpectedly"
+      },
+      {
+        "jobId": "423e4567-e89b-12d3-a456-426614174003",
+        "url": "https://www.youtube.com/watch?v=example4",
+        "filename": "example4.mkv",
+        "status": "PENDING",
+        "s3Key": "recordings/2023/05/04/example4.mkv",
+        "createdAt": "2023-05-04T12:00:00Z"
       }
     ]
   }

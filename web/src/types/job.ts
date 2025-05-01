@@ -20,4 +20,7 @@ export interface Job {
   uploadingAt?:     string;
   finishedAt?:      string;
   errorDetail?:     string;
+  errorMessage?:    string;
+  progress?:        number;  // Percentage of download/recording progress
+  size?:            number;  // Size in bytes
 }
