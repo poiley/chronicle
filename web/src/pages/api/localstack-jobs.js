@@ -2,7 +2,7 @@ import AWS from 'aws-sdk';
 
 // Configure AWS to use LocalStack
 const awsConfig = {
-  region: 'us-east-1',
+  region: 'us-west-1',
   accessKeyId: 'test',
   secretAccessKey: 'test',
   endpoint: process.env.NODE_ENV === 'production' 

@@ -83,9 +83,24 @@ def lambda_handler(event, context):
         try:
             endpoint = os.environ.get("AWS_ENDPOINT_URL")
             if endpoint:
-                # local Docker path
+                # local Docker path - use Docker over HTTP instead of Unix socket
                 import docker
-                client = docker.DockerClient(base_url="unix:///var/run/docker.sock")
+                logger.info("Starting Docker client with HTTP connection")
+                
+                # Always try Docker gateway IP first, which is more reliable in container environments
+                gateway_ip = "172.17.0.1"
+                docker_host = os.environ.get("DOCKER_HOST", f"tcp://{gateway_ip}:2375")
+                
+                try:
+                    logger.info(f"Connecting to Docker via gateway IP: {gateway_ip}")
+                    client = docker.DockerClient(base_url=f"tcp://{gateway_ip}:2375")
+                    client.ping()  # Test connection
+                except Exception as e:
+                    logger.warning(f"Could not connect to Docker via gateway IP: {e}")
+                    # Try the configured DOCKER_HOST as fallback
+                    logger.info(f"Trying to connect to Docker via DOCKER_HOST: {docker_host}")
+                    client = docker.DockerClient(base_url=docker_host)
+                
                 logger.info("Starting local container for job %s", job_id)
                 # make sure /downloads exists on the host (or bind a tmpdir of your choice)
                 LOCAL_DOWNLOADS_DIR="/tmp/downloads"
@@ -93,15 +108,16 @@ def lambda_handler(event, context):
                 container = client.containers.run(
                     image=container_name,
                     command=[url, filename],
-                    network="localstack_default",
+                    network="chronicle-network",
                     volumes={
-                        "/var/run/docker.sock": {
-                            "bind": "/var/run/docker.sock",
-                            "mode": "rw"
-                        },
                         # mount a downloads dir so /downloads inside the container works
                         f"{LOCAL_DOWNLOADS_DIR}": {
                             "bind": "/downloads",
+                            "mode": "rw"
+                        },
+                        # Mount the shared volume for transmission seeding
+                        "chronicle_downloads": {
+                            "bind": "/var/downloads",
                             "mode": "rw"
                         },
                     },
@@ -111,8 +127,11 @@ def lambda_handler(event, context):
                         "S3_BUCKET":    s3_bucket,
                         "S3_KEY":       s3_key,
                         "TTL_DAYS":     str(ttl_days),
-                        # LocalStack sets this so your entrypoint can do aws --endpoint-url
-                        "AWS_ENDPOINT_URL": os.environ.get("AWS_ENDPOINT_URL", ""),
+                        # Make sure we use localstack's container name inside the container network
+                        "AWS_ENDPOINT_URL": "http://chronicle-localstack:4566",
+                        "AWS_REGION": "us-west-1",
+                        "AWS_ACCESS_KEY_ID": "test",
+                        "AWS_SECRET_ACCESS_KEY": "test",
                     },
                     detach=True,
                 )
@@ -126,6 +145,24 @@ def lambda_handler(event, context):
 
                 if exit_code != 0:
                     raise RuntimeError("Local container exited with code %d" % exit_code)
+                    
+                # Explicitly update job status to COMPLETED regardless of what the container tried to do
+                logger.info("Container completed successfully, ensuring job status is COMPLETED")
+                try:
+                    table.update_item(
+                        Key={"jobId": job_id},
+                        UpdateExpression="SET #st = :s, finishedAt = :ft, torrentFile = :tf",
+                        ExpressionAttributeNames={"#st": "status"},
+                        ExpressionAttributeValues={
+                            ":s": "COMPLETED",
+                            ":ft": datetime.datetime.now().isoformat() + "Z",
+                            ":tf": f"watch/{filename}.torrent"
+                        },
+                    )
+                    logger.info("Successfully updated job status to COMPLETED in Lambda")
+                except Exception as e:
+                    logger.error("Failed to update job status to COMPLETED: %s", e)
+                    
             else:
                 # ECS / Fargate path
                 ecs = boto3.client("ecs")

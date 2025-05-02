@@ -9,6 +9,29 @@ A turnkey, serverless system for on-demand recording of livestreams. Submit a li
 5. Create a torrent file and seed it through transmission for P2P sharing.
 6. Serve a React/Tailwind/shadcn dashboard (OLED dark + olive accent) via CloudFront.
 
+## Table of Contents
+- [Development Philosophy](#development-philosophy-localstack-for-development-terraform-for-production)
+- [DevOps & Operational Considerations](#devops--operational-considerations)
+- [Architecture Overview](#architecture-overview)
+- [P2P Distribution with BitTorrent](#p2p-distribution-with-bittorrent)
+- [Production Deployment](#production-deployment)
+- [Component Documentation](#component-documentation)
+
+## Component Documentation
+
+- **Infrastructure**
+  - [LocalStack Setup](docker/localstack/README.md): Local AWS service emulation
+  - [Lambda Functions](terraform/backend/lambda/README.md): AWS Lambda function documentation
+  - [S3 Torrent Feature](terraform/backend/lambda/README-s3-torrent.md): S3 torrent creation system
+
+- **P2P System**
+  - [Transmission Container](docker/transmission/README.md): BitTorrent client setup
+  - [OpenTracker](docker/opentracker/README.md): BitTorrent tracker configuration
+
+- **Development**
+  - [Utility Scripts](util/README.md): Development and maintenance tools
+  - [Web Development](docker/web/README.md): Frontend development setup
+
 ---
 
 ## Development Philosophy: LocalStack for Development, Terraform for Production
@@ -45,52 +68,6 @@ The Docker container handling has been enhanced to work both with ECS in product
 
 ---
 
-## Docker Image & ECS Task
-
-The system uses a Docker container for livestream recording that works seamlessly in both production (ECS Fargate) and local (LocalStack) environments.
-
-The `docker/ecs/Dockerfile` installs:
-- Python 3.11 with the latest `yt-dlp`
-- FFmpeg for media processing
-- AWS CLI for S3 uploads and DynamoDB updates
-
-The container's entrypoint script (`entrypoint.sh`) provides:
-1. Environment detection to work with both AWS and LocalStack
-2. DynamoDB status updates throughout the recording lifecycle
-3. Periodic heartbeats with download progress
-4. Error handling with detailed logs
-5. S3 uploading of the final recording
-
-In production, this image is pushed to ECR and referenced in your ECS task definition for Fargate. For local development, the Lambda function in LocalStack can spawn this container directly via the Docker socket.
-
-### Frontend Docker Container
-
-The frontend web application is containerized to simplify development and deployment:
-
-The `docker/web/Dockerfile` provides:
-1. A multi-stage build with development and production targets
-2. Hot reloading for local development
-3. Optimized production builds with Next.js standalone output
-
-**Development Mode**:
-```bash
-# Start the development server with hot reloading
-./util/build_web_docker.sh dev
-```
-
-**Production Mode**:
-```bash
-# Build production image and test locally
-./util/build_web_docker.sh prod run
-
-# Build production image for deployment
-./util/build_web_docker.sh prod push
-```
-
-The production container can be deployed to any container hosting service (ECS, EKS, AppRunner, etc.) or used with a container registry in your CI/CD pipeline.
-
----
-
 ## Architecture Overview
 
 ```mermaid
@@ -108,6 +85,12 @@ flowchart LR
     L2[Lambda sqs handler]
     ECS[ECS Fargate Chronicle Recorder Task]
     S3[S3 Bucket Recordings]
+  end
+
+  subgraph P2PInfrastructure
+    TR[Transmission Container]
+    OT[Opentracker Container]
+    SV[Shared Volume]
   end
 
   subgraph LocalDevelopment
@@ -128,8 +111,12 @@ flowchart LR
   L2 -->|9 Run ecs task| ECS
   ECS -->|10 Update status| DB
   ECS -->|11 Upload mkv| S3
+  ECS -->|12 Store in volume| SV
 
-  DB -->|12 Query status| API
+  DB -->|13 Query status| API
+  
+  TR -->|14 Seed from volume| SV
+  TR -->|15 Track via| OT
   
   LS --- DC
   LS -.-> DB
@@ -139,13 +126,64 @@ flowchart LR
   LS -.-> L2
 ```
 
-- **`terraform/backend/`**: VPC, subnets, ECS cluster & task definition, IAM roles, SQS FIFO + DLQ, Lambda dispatcher, DynamoDB jobs table, API Gateway REST API.  
-- **`terraform/frontend/`**: S3 bucket + OAI, CloudFront distribution with HTTPS (ACM), optional Route53 for custom domain.  
-- **`web/`**: Next.js + TypeScript + Tailwind + shadcn UI SPA that polls job status every 5 s, displays cards, and offers an inline modal to submit new jobs.  
-- **`util/`**: Helper scripts (`build-web.sh`, `add_to_queue.sh`, `dl-strm.sh`) for building the static site, enqueuing jobs, and local stream recordings.
-- **`docker/localstack/`**: Configuration files and scripts for running AWS services locally with LocalStack.
-- **`docker/web/`**: Docker configuration for frontend development and deployment.
-- **`docker/ecs/`**: Docker configuration for backend stream recording container.
+The system architecture has been enhanced with:
+
+- **P2P Infrastructure**:
+  - **Opentracker**: Lightweight BitTorrent tracker container
+  - **Transmission**: Dedicated seeding container with shared volume access
+  - **Shared Volume**: Persistent storage for recordings and torrents
+
+- **Components**:
+  - **`terraform/backend/`**: VPC, subnets, ECS cluster & task definition, IAM roles, SQS FIFO + DLQ, Lambda dispatcher, DynamoDB jobs table, API Gateway REST API.  
+  - **`terraform/frontend/`**: S3 bucket + OAI, CloudFront distribution with HTTPS (ACM), optional Route53 for custom domain.  
+  - **`web/`**: Next.js + TypeScript + Tailwind + shadcn UI SPA that polls job status every 5 s, displays cards, and offers an inline modal to submit new jobs.  
+  - **`util/`**: Helper scripts for managing development environment, building components, and running tests. See [util/README.md](util/README.md) for details.
+  - **`docker/localstack/`**: Configuration files and scripts for running AWS services locally with LocalStack.
+  - **`docker/web/`**: Docker configuration for frontend development and deployment.
+  - **`docker/ecs/`**: Docker configuration for backend stream recording container.
+  - **`docker/opentracker/`**: BitTorrent tracker container with automatic IP detection.
+  - **`docker/transmission/`**: Transmission container configured for seeding.
+
+---
+
+## P2P Distribution with BitTorrent
+
+Chronicle now features an enhanced P2P distribution system:
+
+1. **Integrated BitTorrent Infrastructure**:
+   - **Opentracker**: Lightweight, high-performance BitTorrent tracker
+   - **Transmission**: Dedicated seeding container with web UI
+   - **Shared Volume**: Ensures files persist across container restarts
+
+2. **Automatic Torrent Creation & Seeding**:
+   - Recording container creates torrent file with `transmission-create`
+   - Torrent files are stored in S3 and a watch directory
+   - Transmission automatically starts seeding new recordings
+   - Job status includes torrent information and tracker URLs
+
+3. **Smart IP Detection & Configuration**:
+   - Opentracker automatically detects its public IP
+   - Configuration propagates to all components
+   - Fallback mechanisms for various network setups
+   - Supports both UDP and TCP tracker protocols
+
+4. **Resource Management**:
+   - Transmission containers are configured with resource limits
+   - Shared volume ensures efficient storage use
+   - Automatic cleanup of old torrents
+   - Configurable seeding ratios and times
+
+5. **Development Environment Integration**:
+   - Full P2P functionality in LocalStack environment
+   - Automatic port forwarding for local testing
+   - Development tools for tracker testing
+   - Easy switching between local and production trackers
+
+To use P2P features:
+1. Download the torrent file from the job details view
+2. Open it in your BitTorrent client
+3. The system will automatically start seeding
+4. Other users can help distribute by continuing to seed
 
 ---
 
@@ -207,53 +245,22 @@ LocalStack provides a fully functional local AWS cloud stack that allows you to 
 
 3. **Verify LocalStack is Running**:
    ```bash
-   curl http://localhost:4566/health
+   curl http://localhost:4566/_localstack/health
    ```
 
-4. **Initialize LocalStack Environment**:
+4. **Initialize Development Environment**:
    ```bash
-   cd docker/localstack
-   ./localstack_setup.sh
+   ./util/setup.sh
    ```
-   This script performs the following setup tasks:
-   - Creates an S3 bucket for recordings (`chronicle-recordings-dev`)
-   - Creates a DynamoDB table for job tracking (`jobs`) with TTL enabled
-   - Sets up SQS FIFO queue (`chronicle-jobs.fifo`) and DLQ (`chronicle-jobs-dlq.fifo`)
-   - Packages and deploys the Lambda function (`dispatch-to-ecs`)
-   - Configures API Gateway with `/jobs` endpoint supporting GET and POST methods
-   - Sets up SQS event source mapping for the Lambda
+   This script performs all necessary setup tasks. See [util/README.md](util/README.md) for details.
 
 5. **Configure Environment Variables**:
    ```bash
    export AWS_ENDPOINT_URL=http://localhost:4566
    export AWS_ACCESS_KEY_ID=test
    export AWS_SECRET_ACCESS_KEY=test
-   export AWS_DEFAULT_REGION=us-east-1
+   export AWS_DEFAULT_REGION=us-west-1
    ```
-
-6. **Use Helper Scripts with LocalStack**:
-   ```bash
-   # Submit a job to the queue
-   ./util/add_to_queue.sh "https://www.youtube.com/watch?v=LIVE_STREAM_ID"
-   
-   # Or use the dummy script for testing
-   ./util/add_to_queue_dummy.sh
-   
-   # Build and reset the LocalStack environment
-   ./util/build_backend_localstack.sh
-   
-   # Clean up LocalStack environment
-   ./util/build_backend_clean.sh
-   ```
-
-7. **Run a Local Docker Container**:
-   The Lambda dispatch function can run Docker containers locally when using LocalStack. The container uses the same `entrypoint.sh` script for both production and local environments:
-   
-   - Automatically detects LocalStack environment via `AWS_ENDPOINT_URL`
-   - Updates job status in DynamoDB at each stage (RECORDING, UPLOADING, COMPLETED/FAILED)
-   - Emits heartbeats with download progress every 60 seconds
-   - Uploads recordings to S3 upon completion
-   - Handles error conditions and updates job status accordingly
 
 ### 3.2 Frontend (`web/`)
 
@@ -264,7 +271,7 @@ LocalStack provides a fully functional local AWS cloud stack that allows you to 
    ```
 2. Create `.env.local`:
    ```env
-   NEXT_PUBLIC_API_URL=https://<api-id>.execute-api.us-east-1.amazonaws.com/prod
+   NEXT_PUBLIC_API_URL=https://<api-id>.execute-api.us-west-1.amazonaws.com/prod
    NEXT_PUBLIC_POLL_INTERVAL=5000
    ```
 3. (Optional) Mock the API:
@@ -278,72 +285,5 @@ LocalStack provides a fully functional local AWS cloud stack that allows you to 
    npm run dev
    ```
    Visit http://localhost:3000 to see the dashboard.
-
-### 4. Helper Scripts (util/)
-
-The project includes several utility scripts to simplify common development and operational tasks:
-
-- **build_web.sh**: Installs dependencies, builds, and exports the Next.js app into `web/out/` for deployment to S3.  
-- **add_to_queue.sh**: Enqueues a new recording job by:
-  ```bash
-  # Format: add_to_queue.sh <QUEUE_URL> <STREAM_URL> [FILENAME] [S3_PREFIX]
-  ./util/add_to_queue.sh "https://sqs.us-east-1.amazonaws.com/000000000000/chronicle-jobs.fifo" "https://www.youtube.com/watch?v=LIVE_ID" "my-recording.mkv"
-  ```
-  This generates a UUID for the job, computes the S3 key, and sends the message to SQS FIFO.
-  
-- **add_to_queue_dummy.sh**: Simplified version that enqueues a test job with defaults.
-
-- **build_backend_localstack.sh**: One-command script to restart and initialize LocalStack:
-  ```bash
-  ./util/build_backend_localstack.sh
-  ```
-  This brings down any existing LocalStack container, starts a fresh one, and runs the setup script.
-
-- **build_backend_clean.sh**: Cleans up LocalStack resources for a fresh start.
-
-- **build_backend_docker.sh**: Builds and pushes the Docker image for production ECS deployment.
-
-- **reset_and_run.sh**: Complete reset and test cycle for LocalStack:
-  1. Tears down LocalStack and removes volumes
-  2. Rebuilds the environment from scratch
-  3. Enqueues a test job to verify functionality
-
-- **dl-strm.sh**: Legacy local stream recorder using `yt-dlp` directly:
-  ```bash
-  ./util/dl-strm.sh "https://www.youtube.com/watch?v=LIVE_ID"
-  ```
-  Useful for testing stream recording without using the full AWS infrastructure.
-
----
-
-## P2P Distribution with BitTorrent
-
-Chronicle now supports peer-to-peer distribution of recorded content using BitTorrent:
-
-1. After a recording is completed and uploaded to S3, the system automatically:
-   - Creates a torrent file for the recording
-   - Launches a transmission container to seed the torrent
-   - Updates the job record with torrent information
-   - Provides the torrent file for download in the web UI
-
-2. **Benefits of the BitTorrent approach:**
-   - Reduces bandwidth costs for S3 downloads
-   - Provides a more reliable downloading experience for users
-   - Allows for persistent access to content even after S3 files expire
-   - Creates a distributed network of seeders if users continue to seed
-
-3. **How it works:**
-   - The recording container creates a torrent file with `transmission-create`
-   - The torrent file is uploaded to S3
-   - A dedicated transmission container is started to seed the content
-   - Users can download either directly from S3 or via the torrent file
-   - After S3 files expire, content remains available via the P2P network
-
-4. **Resource management:**
-   - Transmission containers are configured with resource limits
-   - EFS storage is used for persistent seeding across container restarts
-   - TTL settings ensure containers are terminated after sufficient seeding time
-
-To use this feature, simply download the torrent file from the job details view and open it in your BitTorrent client.
 
 ---

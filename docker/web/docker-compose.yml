@@ -21,7 +21,7 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - default
-      - localstack
+      - chronicle-network
 
   # Production service
   web-prod:
@@ -39,9 +39,9 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - default
-      - localstack
+      - chronicle-network
 
 networks:
-  localstack:
+  chronicle-network:
     external: true
-    name: localstack_default 
+    name: chronicle-network 

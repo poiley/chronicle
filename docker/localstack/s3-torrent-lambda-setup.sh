@@ -10,6 +10,7 @@ LAMBDA_NAME="s3-torrent-creator"
 LAMBDA_HANDLER="s3_torrent_creator_local.lambda_handler"
 FUNCTION_DIR="./terraform/backend/lambda"
 REGION="us-west-1"
+TMP_DIR="/tmp/lambda_setup"  # Using system /tmp directory
 
 # Try to detect the tracker's IP
 get_tracker_ip() {
@@ -39,7 +40,7 @@ TRACKER_URL="udp://${TRACKER_IP}:${TRACKER_PORT}"
 echo "Using tracker URL: $TRACKER_URL"
 
 # Get the Docker network address of the LocalStack container
-LOCALSTACK_DOCKER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' localstack-localstack-1 2>/dev/null)
+LOCALSTACK_DOCKER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' chronicle-localstack 2>/dev/null)
 if [ -z "$LOCALSTACK_DOCKER_IP" ]; then
   echo "Could not get LocalStack Docker IP, using default"
   LAMBDA_ENDPOINT_URL="$LOCALSTACK_ENDPOINT"
@@ -55,7 +56,7 @@ if ! docker ps &>/dev/null; then
 fi
 
 # Check if LocalStack is running
-if ! curl -s "$LOCALSTACK_ENDPOINT/_localstack/health" | grep -q "\"s3\": \"running\""; then
+if ! response=$(curl -s http://localhost:4566/_localstack/health) || ! echo "$response" | grep -q '"services"'; then
   echo "LocalStack doesn't seem to be running. Please start LocalStack and try again."
   exit 1
 fi
@@ -83,8 +84,8 @@ aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" s3api put-object \
 
 # Create a Lambda deployment package
 echo "Creating Lambda deployment package..."
-rm -rf tmp/lambda tmp/s3_torrent_creator.zip
-mkdir -p tmp/lambda
+rm -rf "$TMP_DIR" "$TMP_DIR.zip"
+mkdir -p "$TMP_DIR"
 
 # Check if the Python file exists
 if [ ! -f "$FUNCTION_DIR/s3_torrent_creator_local.py" ]; then
@@ -93,13 +94,17 @@ if [ ! -f "$FUNCTION_DIR/s3_torrent_creator_local.py" ]; then
   exit 1
 fi
 
-cp "$FUNCTION_DIR/s3_torrent_creator_local.py" tmp/lambda/s3_torrent_creator_local.py
-cd tmp/lambda
+cp "$FUNCTION_DIR/s3_torrent_creator_local.py" "$TMP_DIR/s3_torrent_creator_local.py"
+cd "$TMP_DIR" || {
+  echo "ERROR: Could not cd to $TMP_DIR"
+  exit 1
+}
+
 echo "Installing dependencies..."
 pip install -q -t . boto3 botocore >/dev/null 2>&1 || echo "WARNING: dependency installation issues, but continuing"
 echo "Creating ZIP archive..."
-zip -q -r ../s3_torrent_creator.zip . >/dev/null || echo "WARNING: ZIP creation issues, but continuing"
-cd ../../
+zip -q -r ../lambda_setup.zip . >/dev/null || echo "WARNING: ZIP creation issues, but continuing"
+cd - >/dev/null || echo "WARNING: Could not cd back to original directory"
 
 # Check if Lambda function exists and remove it if it does
 echo "Checking for existing Lambda function..."
@@ -121,11 +126,11 @@ echo "Using endpoint URL for Lambda: $LAMBDA_ENDPOINT_URL"
 LAMBDA_CREATE_RESULT=0
 aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager lambda create-function \
   --function-name "$LAMBDA_NAME" \
-  --zip-file "fileb://tmp/s3_torrent_creator.zip" \
+  --zip-file "fileb:///tmp/lambda_setup.zip" \
   --handler "$LAMBDA_HANDLER" \
   --runtime "python3.9" \
   --role "arn:aws:iam::000000000000:role/s3-torrent-lambda-role" \
-  --environment "Variables={S3_BUCKET=$BUCKET_NAME,DDB_TABLE=jobs,TRACKERS=$TRACKER_URL,AWS_ENDPOINT_URL=$LAMBDA_ENDPOINT_URL}" \
+  --environment "Variables={S3_BUCKET=$BUCKET_NAME,DDB_TABLE=jobs,TRACKERS=$TRACKER_URL,AWS_ENDPOINT_URL=$LAMBDA_ENDPOINT_URL,DOCKER_HOST=tcp://host.docker.internal:2375}" \
   --timeout 300 \
   --memory-size 1024 || LAMBDA_CREATE_RESULT=1
 
@@ -187,7 +192,7 @@ fi
 
 # Cleanup
 echo "Cleaning up temporary files..."
-rm -rf tmp || echo "Cleanup had issues, but that's fine"
+rm -rf "/tmp/lambda_setup.zip" || echo "Cleanup had issues, but that's fine"
 
 echo "===== S3 Torrent Lambda Setup Complete ====="
 echo "Try uploading a file to S3 to test:"

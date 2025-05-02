@@ -9,7 +9,7 @@ services:
       - DEBUG=1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-west-1
       - DATA_DIR=/data
       - LAMBDA_EXECUTOR=docker
       - DOCKER_HOST=unix:///var/run/docker.sock

@@ -31,6 +31,21 @@ data "aws_iam_policy_document" "s3_put" {
   }
 }
 
+# S3 read permissions for the watch folder
+data "aws_iam_policy_document" "s3_read_watch" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket"
+    ]
+    resources = [
+      aws_s3_bucket.streams.arn,
+      "${aws_s3_bucket.streams.arn}/watch/*"
+    ]
+  }
+}
+
 resource "aws_iam_role" "ecs_task_role" {
   name               = "${var.environment}-ecs-task-role"
   assume_role_policy = data.aws_iam_policy_document.exec_assume.json
@@ -40,6 +55,12 @@ resource "aws_iam_role_policy" "ecs_task_s3_put" {
   name   = "AllowS3PutObject"
   role   = aws_iam_role.ecs_task_role.id
   policy = data.aws_iam_policy_document.s3_put.json
+}
+
+resource "aws_iam_role_policy" "ecs_task_s3_read_watch" {
+  name   = "AllowS3ReadWatch"
+  role   = aws_iam_role.ecs_task_role.id
+  policy = data.aws_iam_policy_document.s3_read_watch.json
 }
 
 # Lambda Execution Role

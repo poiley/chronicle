@@ -1,43 +1,42 @@
-FROM ubuntu:24.04 as builder
+FROM alpine:latest as builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cvs \
+RUN apk add --no-cache \
+    gcc \
+    g++ \
+    make \
     git \
-    zlib1g-dev \
+    cvs \
+    zlib-dev \
     curl \
-    iproute2 \
-    gcc-multilib \
-    g++-multilib \
-    && rm -rf /var/lib/apt/lists/*
+    iproute2
 
 # Build libowfat
 RUN cvs -d :pserver:cvs@cvs.fefe.de:/cvs -z9 co libowfat \
-    && cd libowfat && make
+    && cd libowfat \
+    && make
 
 # Build opentracker
-RUN git clone https://erdgeist.org/gitweb/opentracker.git \
+RUN git clone git://erdgeist.org/opentracker \
     && cd opentracker \
     && make
 
 # Runtime stage
-FROM ubuntu:24.04
+FROM alpine:latest
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     curl \
-    iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+    iproute2
 
 # Copy built binaries and scripts
 COPY --from=builder /opentracker/opentracker /usr/local/bin/
 COPY --from=builder /libowfat/libowfat.a /usr/local/lib/
-COPY docker/opentracker/detect-ip.sh /usr/local/bin/
+COPY detect-ip.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/detect-ip.sh
 
 # Create entrypoint script
-RUN echo '#!/bin/bash\n\
+RUN echo '#!/bin/sh\n\
 echo "Detecting public IP..."\n\
 IP=$(/usr/local/bin/detect-ip.sh)\n\
 echo "Detected public IP: $IP"\n\
@@ -45,7 +44,7 @@ echo "Starting tracker on $IP:6969"\n\
 exec /usr/local/bin/opentracker -i "$IP" -p 6969 -P 6969' > /entrypoint.sh \
     && chmod +x /entrypoint.sh
 
-# Run as root for proper port binding
-USER root
+EXPOSE 6969
+EXPOSE 6969/udp
 
 ENTRYPOINT ["/entrypoint.sh"] 

@@ -18,7 +18,7 @@ variable "bucket_name" {
 
 variable "acm_certificate_arn" {
   description = <<-EOF
-    Optional ACM certificate ARN in us-east-1 for a custom domain.
+    Optional ACM certificate ARN in us-west-1 for a custom domain.
     If empty, CloudFront's default certificate (*.cloudfront.net) is used.
   EOF
   type    = string

@@ -67,4 +67,4 @@ To verify the configuration:
 2. Run `./util/track-ip-config.sh`
 3. Check the output to confirm the detected IP
 4. Verify the configuration files have been updated with the correct IP
-5. Upload a file and confirm the torrent file is created with the correct tracker
+5. Upload a file and confirm the torrent file is created with the correct tracker 

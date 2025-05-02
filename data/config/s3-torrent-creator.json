@@ -1,7 +1,7 @@
 {
   "bucket_name": "chronicle-recordings-dev",
   "prefix": "",
-  "region": "us-east-1",
+  "region": "us-west-1",
   "endpoint_url": "http://localstack:4566",
   "download_dir": "/downloads",
   "watch_dir": "/watch",

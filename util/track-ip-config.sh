@@ -1,38 +1,34 @@
 #!/bin/bash
 set -euo pipefail
 
-# Script to detect the opentracker's public IP and configure it in all relevant files
+# Script to configure the opentracker's IP in all relevant files
 
-# Determine the opentracker container name based on the environment
-TRACKER_CONTAINER="torrent-tracker"
+# Use the opentracker container name from setup_fixed.sh
+OPENTRACKER_CONTAINER="chronicle-opentracker"
 
-# Try to get IP from the container's shared file
+# Get tracker IP from the container
 get_tracker_ip() {
-  # First try to get IP from the container (if running)
-  if docker ps | grep -q "$TRACKER_CONTAINER"; then
-    # Try to get IP from the shared file in the container
-    IP=$(docker exec "$TRACKER_CONTAINER" cat /tmp/public-ip 2>/dev/null || echo "")
-    
+  # Try to get IP from the container
+  if docker ps | grep -q "$OPENTRACKER_CONTAINER"; then
+    IP=$(docker exec "$OPENTRACKER_CONTAINER" cat /tmp/public-ip 2>/dev/null || echo "")
     if [ -n "$IP" ] && [ "$IP" != "127.0.0.1" ]; then
       echo "$IP"
       return 0
     fi
   fi
   
-  # If that fails, try to get our own public IP
-  IP=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me || curl -s https://icanhazip.com)
-  if [ -n "$IP" ]; then
-    echo "$IP"
-    return 0
-  fi
-  
-  # If everything fails, use a default
-  echo "127.0.0.1"
+  echo "Error: Opentracker container not running or IP not detected"
   return 1
 }
 
 # Get tracker IP and port
 TRACKER_IP=$(get_tracker_ip)
+if [ $? -ne 0 ]; then
+  echo "Failed to get tracker IP. Is the opentracker container running?"
+  echo "Run setup_fixed.sh first to ensure the opentracker container is up."
+  exit 1
+fi
+
 TRACKER_PORT=6969
 TRACKER_URL="udp://${TRACKER_IP}:${TRACKER_PORT}"
 
@@ -65,8 +61,7 @@ update_lambda_env() {
   SETUP_SCRIPT="docker/localstack/s3-torrent-lambda-setup.sh"
   if [ -f "$SETUP_SCRIPT" ]; then
     echo "Updating $SETUP_SCRIPT..."
-    # Use sed to update the TRACKERS environment variable
-    sed -i "s|TRACKERS=udp://opentracker.example.com:1337|TRACKERS=${TRACKER_URL}|g" "$SETUP_SCRIPT"
+    sed -i "s|TRACKERS=udp://[^:]*:[0-9]*|TRACKERS=${TRACKER_URL}|g" "$SETUP_SCRIPT"
     echo "Updated $SETUP_SCRIPT"
   else
     echo "Warning: $SETUP_SCRIPT not found, skipping"
@@ -78,8 +73,7 @@ update_entrypoint() {
   ENTRYPOINT_SCRIPT="docker/ecs/entrypoint.sh"
   if [ -f "$ENTRYPOINT_SCRIPT" ]; then
     echo "Updating $ENTRYPOINT_SCRIPT..."
-    # Use sed to update the transmission-create command
-    sed -i "s|udp://opentracker.example.com:1337|${TRACKER_URL}|g" "$ENTRYPOINT_SCRIPT"
+    sed -i "s|udp://[^:]*:[0-9]*|${TRACKER_URL}|g" "$ENTRYPOINT_SCRIPT"
     echo "Updated $ENTRYPOINT_SCRIPT"
   else
     echo "Warning: $ENTRYPOINT_SCRIPT not found, skipping"
@@ -91,8 +85,7 @@ update_lambda_files() {
   for LAMBDA_FILE in terraform/backend/lambda/s3_torrent_creator.py terraform/backend/lambda/s3_torrent_creator_local.py; do
     if [ -f "$LAMBDA_FILE" ]; then
       echo "Updating $LAMBDA_FILE..."
-      # Use sed to update the default TRACKERS value
-      sed -i "s|TRACKERS = os.environ.get('TRACKERS', 'udp://opentracker.example.com:1337')|TRACKERS = os.environ.get('TRACKERS', '${TRACKER_URL}')|g" "$LAMBDA_FILE"
+      sed -i "s|TRACKERS = os.environ.get('TRACKERS', 'udp://[^:]*:[0-9]*')|TRACKERS = os.environ.get('TRACKERS', '${TRACKER_URL}')|g" "$LAMBDA_FILE"
       echo "Updated $LAMBDA_FILE"
     else
       echo "Warning: $LAMBDA_FILE not found, skipping"
@@ -105,8 +98,7 @@ update_terraform() {
   TF_FILE="terraform/backend/s3-torrent-lambda.tf"
   if [ -f "$TF_FILE" ]; then
     echo "Updating $TF_FILE..."
-    # Use sed to update the TRACKERS variable in the environment block
-    sed -i "s|TRACKERS  = \"udp://opentracker.example.com:1337\"|TRACKERS  = \"${TRACKER_URL}\"|g" "$TF_FILE"
+    sed -i "s|TRACKERS  = \"udp://[^:]*:[0-9]*\"|TRACKERS  = \"${TRACKER_URL}\"|g" "$TF_FILE"
     echo "Updated $TF_FILE"
   else
     echo "Warning: $TF_FILE not found, skipping"

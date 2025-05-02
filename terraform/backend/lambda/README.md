@@ -1,128 +1,107 @@
-# LocalStack Quickstart Guide
+# Lambda Functions
 
-A minimal guide to run AWS services locally with LocalStack via Docker Compose.
+This directory contains the Lambda functions used in the Chronicle system. There are two main Lambda functions:
 
----
+1. **Dispatch to ECS** (`dispatch_to_ecs.py`): Handles job requests and launches ECS tasks
+2. **S3 Torrent Creator** (`s3_torrent_creator.py`): Creates torrent files for S3 uploads
 
-## 1. Prerequisites
+For the S3 torrent creator documentation, see [README-s3-torrent.md](README-s3-torrent.md).
 
-- Docker & Docker Compose installed  
-- (Optional) Python 3 & `pip` for `awscli-local` wrapper  
-- (Optional) AWS CLI v2
+## Dispatch to ECS Lambda
 
----
+The dispatch Lambda function is triggered by:
+- API Gateway requests (REST API)
+- SQS messages (job queue)
 
-## 2. Docker Compose Configuration
+### Configuration
 
-Create a file named `docker-compose.yml`:
+Environment variables:
+- `ECS_CLUSTER`: ECS cluster name
+- `ECS_TASK_DEF`: ECS task definition ARN
+- `S3_BUCKET`: Target S3 bucket for recordings
+- `DDB_TABLE`: DynamoDB table for job tracking
+- `CONTAINER_NAME`: ECS container name
+- `TTL_DAYS`: DynamoDB record TTL in days
+- `TRANSMISSION_TASK_DEF`: Transmission ECS task definition
 
-```yaml
-version: '3.8'
-services:
-  localstack:
-    image: localstack/localstack:latest
-    ports:
-      - "4566:4566"       # Main edge port (all services)
-      - "4571:4571"       # Optional legacy port
-    environment:
-      - SERVICES=s3,sqs,dynamodb,lambda,apigateway
-      - DEBUG=1
-      - DATA_DIR=/data
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
-      - AWS_DEFAULT_REGION=us-east-1
-      - LAMBDA_EXECUTOR=docker
-    volumes:
-      - localstack_data:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    restart: always
+### Local Development
 
-volumes:
-  localstack_data:
-```
+1. Start LocalStack:
+   ```bash
+   cd docker/localstack
+   docker-compose up -d
+   ```
 
----
+2. Run the setup script:
+   ```bash
+   ./localstack_setup.sh
+   ```
 
-## 3. Start LocalStack
+3. Test the function:
+   ```bash
+   # Via API Gateway
+   curl -X POST http://localhost:4566/restapis/[API_ID]/test/_user_request_/jobs \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com/stream"}'
 
-```bash
-docker-compose up -d
-```
+   # Direct Lambda invocation
+   aws --endpoint-url=http://localhost:4566 lambda invoke \
+     --function-name dispatch-to-ecs \
+     --payload '{"url": "https://example.com/stream"}' \
+     output.json
+   ```
 
-- Check logs:  
-  ```bash
-  docker-compose logs -f localstack
-  ```
+### Deployment
 
----
+The function is deployed via Terraform in `terraform/backend/lambda.tf`. Key configurations:
 
-## 4. Health Check
+- IAM role with permissions for:
+  - ECS task launching
+  - DynamoDB access
+  - SQS message processing
+  - CloudWatch logging
 
-LocalStack’s public health endpoint has moved under an internal path:
+- Function settings:
+  - Memory: 128 MB
+  - Timeout: 30 seconds
+  - Runtime: Python 3.9
 
-```bash
-curl http://localhost:4566/_localstack/health
-# or filter by service
-curl http://localhost:4566/_localstack/health?services=s3,sqs,lambda
-```
+### Error Handling
 
----
+The function implements robust error handling:
 
-## 5. AWS CLI Usage
+1. **Input Validation**
+   - Validates URL format
+   - Checks for required parameters
+   - Sanitizes input data
 
-### 5.1 Environment
+2. **ECS Task Launch**
+   - Retries on transient failures
+   - Handles capacity issues
+   - Reports detailed error messages
 
-```bash
-export AWS_ACCESS_KEY_ID=test
-export AWS_SECRET_ACCESS_KEY=test
-export AWS_DEFAULT_REGION=us-east-1
-```
+3. **DynamoDB Updates**
+   - Uses conditional writes
+   - Handles throttling
+   - Implements retry logic
 
-### 5.2 Direct Calls
+4. **SQS Processing**
+   - Handles partial batch failures
+   - Implements dead-letter queue
+   - Manages message visibility
 
-Use the `--endpoint-url` flag:
+### Monitoring
 
-```bash
-aws --endpoint-url=http://localhost:4566 s3 ls
-aws --endpoint-url=http://localhost:4566 sqs list-queues
-aws --endpoint-url=http://localhost:4566 dynamodb list-tables
-aws --endpoint-url=http://localhost:4566 lambda list-functions
-```
+The function emits CloudWatch metrics for:
+- Invocation count
+- Error rate
+- Duration
+- Throttling
+- ECS task launch success/failure
 
-### 5.3 `awscli-local` (Optional)
+### Related Components
 
-```bash
-pip install awscli-local
-awslocal s3 mb s3://my-bucket
-awslocal sqs create-queue --queue-name my-queue
-```
-
----
-
-## 6. SDK Usage (Python / Boto3)
-
-```python
-import boto3
-
-client = boto3.client(
-    's3',
-    endpoint_url='http://localhost:4566',
-    aws_access_key_id='test',
-    aws_secret_access_key='test',
-    region_name='us-east-1'
-)
-
-# Example: list buckets
-print(client.list_buckets())
-```
-
----
-
-## 7. Tips & Troubleshooting
-
-- **Lambda in Docker**: ensure `/var/run/docker.sock` is mounted and `LAMBDA_EXECUTOR=docker`.  
-- **Port Conflicts**: only one process may bind port 4566.  
-- **Persisting Data**: LocalStack stores state under `/data` (mapped to `localstack_data`).  
-- **Logs & Debugging**: set `DEBUG=1` for verbose output.  
-
----
+- [LocalStack Setup](../../docker/localstack/README.md)
+- [ECS Task Definition](../../docker/ecs/README.md)
+- [DynamoDB Schema](../dynamodb.tf)
+- [API Gateway Configuration](../api.tf)

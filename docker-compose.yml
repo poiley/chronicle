@@ -8,7 +8,7 @@ services:
       - "4566:4566"
     environment:
       - SERVICES=dynamodb,s3,sqs,lambda,apigateway
-      - DEFAULT_REGION=us-east-1
+      - DEFAULT_REGION=us-west-1
       - DEBUG=1
       - LAMBDA_EXECUTOR=docker
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -63,6 +63,14 @@ services:
       - "downloads-data:/downloads"
       - "watch-data:/watch"
       - "config-data:/config"
+    environment:
+      - S3_BUCKET=chronicle-recordings-dev
+      - AWS_ENDPOINT=http://localstack:4566
+      - AWS_REGION=us-west-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    depends_on:
+      - localstack
     networks:
       - chronicle-network
 

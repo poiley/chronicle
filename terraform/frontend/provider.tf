@@ -12,8 +12,8 @@ provider "aws" {
   region = var.aws_region
 }
 
-# CloudFront distributions only accept ACM certs from us-east-1
+# CloudFront distributions only accept ACM certs from us-west-1
 provider "aws" {
   alias  = "us_east_1"
-  region = "us-east-1"
+  region = "us-west-1"
 }

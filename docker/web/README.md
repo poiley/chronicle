@@ -67,7 +67,7 @@ The web container connects directly to the LocalStack container to access:
 
 This integration is configured through:
 
-1. Shared Docker network (`localstack_default`)
+1. Shared Docker network (`chronicle-network`)
 2. Direct container name resolution (`http://localstack:4566`)
 3. Next.js API routes that use the AWS SDK directly (`/api/localstack-jobs.js`)
 
@@ -76,7 +76,7 @@ This integration is configured through:
 If the web app is not connecting to LocalStack:
 
 1. Make sure LocalStack is running: `docker ps | grep localstack`
-2. Verify network connection: `docker network inspect localstack_default`
+2. Verify network connection: `docker network inspect chronicle-network`
 3. Check container logs: `docker-compose logs -f web-dev`
 4. View the API logs in the Next.js console
 

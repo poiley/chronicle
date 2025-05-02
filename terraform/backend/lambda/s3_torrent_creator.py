@@ -19,7 +19,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 # Environment variables
-TRACKERS = os.environ.get('TRACKERS', 'udp://opentracker.example.com:1337')
+TRACKERS = os.environ.get('TRACKERS', 'udp://23.252.56.60:6969')
 s3_bucket_name = os.environ.get('S3_BUCKET')
 
 # Initialize AWS clients

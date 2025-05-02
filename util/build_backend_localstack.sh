@@ -1,1 +1,0 @@
-docker compose -f docker/localstack/docker-compose.yml down && docker compose -f docker/localstack/docker-compose.yml up -d  ; sleep 1 && ./docker/localstack/localstack_setup.sh

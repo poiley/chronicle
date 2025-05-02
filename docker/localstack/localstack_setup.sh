@@ -4,7 +4,7 @@ set -euo pipefail
 # Dummy AWS creds so aws CLI works against LocalStack
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
-export AWS_REGION=${AWS_REGION:-us-east-1}
+export AWS_REGION=${AWS_REGION:-us-west-1}
 export ENVIRONMENT=${ENVIRONMENT:-dev}
 
 LOCALSTACK_HOST=${LOCALSTACK_HOST:-localhost}
@@ -120,7 +120,7 @@ else
     --role arn:aws:iam::000000000000:role/irrelevant \
     --zip-file fileb://"$LAMBDA_ZIP" \
     --timeout 300 \
-    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=chronicle-recorder-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=chronicle-recorder,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30,TRANSMISSION_TASK_DEF=chronicle-transmission-task}"
+    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=chronicle-recorder-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=chronicle-recorder,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30,TRANSMISSION_TASK_DEF=chronicle-transmission-task,DOCKER_HOST=tcp://host.docker.internal:2375}"
 fi
 
 # 5.1) Create transmission ECS task definition

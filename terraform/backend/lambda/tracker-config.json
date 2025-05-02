@@ -1,10 +1,10 @@
 {
   "trackers": {
-    "primary": "udp://opentracker.example.com:1337",
+    "primary": "udp://23.252.56.60:6969",
     "fallback": []
   },
   "torrent_options": {
     "comment": "Chronicle Livestream Recording",
     "piece_length": 16384
   }
-} 
+}

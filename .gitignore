@@ -62,9 +62,30 @@ docker-compose.*.yml
 **/build/
 
 #--------------------------------------
+# LocalStack & Development
+#--------------------------------------
+.localstack/
+tmp/
+recordings/
+data/
+
+#--------------------------------------
+# P2P & BitTorrent
+#--------------------------------------
+*.torrent
+*.fastresume
+*.part
+transmission/
+*.resume
+*.dht
+*.blocklist
+
+#--------------------------------------
 # Logs
 #--------------------------------------
 *.log
+logs/
+*.debug
 
 #--------------------------------------
 # Credentials & Secrets
@@ -72,9 +93,16 @@ docker-compose.*.yml
 .env
 aws_credentials
 aws_config
+*.pem
+*.key
 
 #--------------------------------------
 # Miscellaneous
 #--------------------------------------
 coverage/
 *.zip
+.tmp/
+out/
+tmp/
+recordings/
+data/

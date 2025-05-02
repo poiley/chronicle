@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     // Configure AWS clients
     const awsConfig = {
       endpoint: apiUrl,
-      region: 'us-east-1',
+      region: 'us-west-1',
       accessKeyId: 'test',
       secretAccessKey: 'test'
     };

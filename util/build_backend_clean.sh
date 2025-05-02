@@ -1,1 +1,0 @@
-docker compose -f docker/localstack/docker-compose.yml down && docker volume rm localstack_localstack_data && rm terraform/backend/lambda/dispatch_to_ecs.zip
