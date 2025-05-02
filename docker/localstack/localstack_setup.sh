@@ -125,14 +125,20 @@ fi
 
 # 5.1) Create transmission ECS task definition
 echo "➜ Creating transmission ECS task definition"
-$AWS_CLI ecs register-task-definition \
+# Attempt to create ECS task but don't fail if it doesn't work (LocalStack OSS limitation)
+if $AWS_CLI ecs register-task-definition \
   --family chronicle-transmission-task \
   --container-definitions '[{
     "name": "chronicle-transmission",
     "image": "chronicle-transmission:latest",
     "essential": true,
     "environment": []
-  }]'
+  }]' 2>/dev/null; then
+  echo "✅ Successfully created ECS task definition"
+else
+  echo "⚠️ ECS task definition creation skipped (not supported in OSS LocalStack)"
+  echo "ℹ️ This is expected and won't affect Docker-based testing"
+fi
 
 # 6) API Gateway
 echo "➜ Creating API Gateway REST API: $API_NAME"

@@ -1,0 +1,13 @@
+{
+  "bucket_name": "chronicle-recordings-dev",
+  "prefix": "",
+  "region": "us-east-1",
+  "endpoint_url": "http://localstack:4566",
+  "download_dir": "/downloads",
+  "watch_dir": "/watch",
+  "tracker_host": "tracker",
+  "tracker_port": 6969,
+  "poll_interval": 10,
+  "aws_access_key_id": "test",
+  "aws_secret_access_key": "test"
+}
