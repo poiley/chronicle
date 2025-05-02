@@ -118,10 +118,17 @@ ddb_update CREATING_TORRENT \
 # Get the full S3 path of the uploaded file
 S3_FULL_PATH="s3://$S3_BUCKET/$S3_KEY/$(basename "$TARGET")"
 TORRENT_FILE="/tmp/$(basename "$TARGET").torrent"
-TORRENT_S3_KEY="$S3_KEY/$(basename "$TARGET").torrent"
+
+# Store torrent in the watch subfolder
+TORRENT_S3_KEY="watch/$(basename "$TARGET").torrent"
+
+# Ensure the watch folder exists
+echo "Ensuring watch folder exists in S3 bucket..."
+$AWS_CLI s3api head-object --bucket "$S3_BUCKET" --key "watch/" &>/dev/null || \
+  $AWS_CLI s3api put-object --bucket "$S3_BUCKET" --key "watch/" --content-length 0
 
 # Create torrent file with transmission-create
-transmission-create -o "$TORRENT_FILE" -c "Chronicle Livestream Recording" -t udp://tracker.opentrackr.org:1337 "$TARGET"
+transmission-create -o "$TORRENT_FILE" -c "Chronicle Livestream Recording" -t udp://opentracker.example.com:1337 "$TARGET"
 
 # Upload torrent file to S3
 $AWS_CLI s3 cp "$TORRENT_FILE" "s3://$S3_BUCKET/$TORRENT_S3_KEY" 2>>"$LOGFILE"

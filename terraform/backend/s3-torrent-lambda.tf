@@ -114,7 +114,7 @@ resource "aws_lambda_function" "s3_torrent_creator" {
     variables = {
       S3_BUCKET = aws_s3_bucket.recordings.id
       DDB_TABLE = aws_dynamodb_table.jobs.name
-      TRACKERS  = "udp://tracker.opentrackr.org:1337,udp://open.demonii.com:1337,udp://tracker.openbittorrent.com:80"
+      TRACKERS  = "udp://opentracker.example.com:1337"
     }
   }
 

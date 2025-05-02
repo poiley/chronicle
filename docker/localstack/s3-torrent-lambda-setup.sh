@@ -11,6 +11,33 @@ LAMBDA_HANDLER="s3_torrent_creator_local.lambda_handler"
 FUNCTION_DIR="./terraform/backend/lambda"
 REGION="us-west-1"
 
+# Try to detect the tracker's IP
+get_tracker_ip() {
+  # Try to get from container
+  IP=""
+  if docker ps | grep -q "torrent-tracker"; then
+    IP=$(docker exec torrent-tracker cat /tmp/public-ip 2>/dev/null || echo "")
+  fi
+  
+  # If that fails, try to get our own public IP
+  if [ -z "$IP" ] || [ "$IP" = "127.0.0.1" ]; then
+    IP=$(curl -s https://api.ipify.org 2>/dev/null || curl -s https://ifconfig.me 2>/dev/null || curl -s https://icanhazip.com 2>/dev/null || echo "")
+  fi
+  
+  # If everything fails, use the example domain
+  if [ -z "$IP" ]; then
+    echo "opentracker.example.com"
+  else
+    echo "$IP"
+  fi
+}
+
+# Get the tracker IP and build the tracker URL
+TRACKER_IP=$(get_tracker_ip)
+TRACKER_PORT=6969
+TRACKER_URL="udp://${TRACKER_IP}:${TRACKER_PORT}"
+echo "Using tracker URL: $TRACKER_URL"
+
 # Get the Docker network address of the LocalStack container
 LOCALSTACK_DOCKER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' localstack-localstack-1 2>/dev/null)
 if [ -z "$LOCALSTACK_DOCKER_IP" ]; then
@@ -46,6 +73,13 @@ if ! aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" s3api head-buc
 else
   echo "Bucket '$BUCKET_NAME' already exists, skipping creation."
 fi
+
+# Create the watch folder in the S3 bucket
+echo "Creating watch folder in S3 bucket..."
+aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" s3api put-object \
+  --bucket "$BUCKET_NAME" \
+  --key "watch/" \
+  --content-length 0 || echo "Failed to create watch folder, but continuing"
 
 # Create a Lambda deployment package
 echo "Creating Lambda deployment package..."
@@ -91,7 +125,7 @@ aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager lamb
   --handler "$LAMBDA_HANDLER" \
   --runtime "python3.9" \
   --role "arn:aws:iam::000000000000:role/s3-torrent-lambda-role" \
-  --environment "Variables={S3_BUCKET=$BUCKET_NAME,DDB_TABLE=jobs,TRACKERS=udp://tracker.opentrackr.org:1337,AWS_ENDPOINT_URL=$LAMBDA_ENDPOINT_URL}" \
+  --environment "Variables={S3_BUCKET=$BUCKET_NAME,DDB_TABLE=jobs,TRACKERS=$TRACKER_URL,AWS_ENDPOINT_URL=$LAMBDA_ENDPOINT_URL}" \
   --timeout 300 \
   --memory-size 1024 || LAMBDA_CREATE_RESULT=1
 

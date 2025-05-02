@@ -74,5 +74,13 @@ else
   echo "WARNING: S3 torrent Lambda setup script not found"
 fi
 
+# Configure trackers with the opentracker IP
+echo "==============================================="
+echo "Configuring tracker URLs with opentracker IP..."
+echo "==============================================="
+./util/track-ip-config.sh || {
+  echo "WARNING: Tracker configuration failed, using default values"
+}
+
 echo "===== Docker images rebuild process completed ====="
 echo "The system is ready for testing" 

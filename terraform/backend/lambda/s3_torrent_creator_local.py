@@ -18,7 +18,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 # Environment variables
-TRACKERS = os.environ.get('TRACKERS', 'udp://tracker.opentrackr.org:1337,udp://open.demonii.com:1337,udp://tracker.openbittorrent.com:80')
+TRACKERS = os.environ.get('TRACKERS', 'udp://opentracker.example.com:1337')
 s3_bucket_name = os.environ.get('S3_BUCKET')
 
 # Initialize AWS clients
@@ -111,6 +111,32 @@ def check_dynamodb_table():
             logger.error(f"Error checking DynamoDB table: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
             return False
 
+def ensure_watch_folder_exists(bucket_name):
+    """Create the watch folder in S3 if it doesn't exist"""
+    try:
+        # Check if folder exists by listing objects with prefix
+        response = s3_client.list_objects_v2(
+            Bucket=bucket_name,
+            Prefix="watch/",
+            MaxKeys=1
+        )
+        
+        # If folder doesn't exist, create it
+        if 'Contents' not in response or not response['Contents']:
+            logger.info(f"Creating watch folder in bucket {bucket_name}")
+            # Create an empty object with the folder name as the key
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key="watch/"
+            )
+            logger.info(f"Watch folder created in bucket {bucket_name}")
+        else:
+            logger.info(f"Watch folder already exists in bucket {bucket_name}")
+            
+    except Exception as e:
+        logger.error(f"Error ensuring watch folder exists: {str(e)}")
+        # Don't raise the exception, as this is not critical for the main flow
+
 def lambda_handler(event, context):
     """Lambda handler for S3 event triggers"""
     logger.info(f"START handler; event: {json.dumps(event)}")
@@ -134,21 +160,42 @@ def lambda_handler(event, context):
         s3_bucket = record['s3']['bucket']['name']
         s3_key = urllib.parse.unquote_plus(record['s3']['object']['key'])
         
+        # Ensure the watch folder exists
+        ensure_watch_folder_exists(s3_bucket)
+        
         # Skip torrent files
         if s3_key.endswith('.torrent'):
             logger.info(f"Skipping torrent file: {s3_key}")
             continue
             
-        # Skip if torrent already exists
+        # Skip if torrent already exists in original location or watch folder
         torrent_s3_key = s3_key + '.torrent'
+        watch_torrent_s3_key = f"watch/{os.path.basename(s3_key)}.torrent"
+        
+        torrent_exists = False
         try:
+            # Check original location
             s3_client.head_object(Bucket=s3_bucket, Key=torrent_s3_key)
-            logger.info(f"Torrent already exists for {s3_key}, skipping")
-            continue
+            logger.info(f"Torrent already exists for {s3_key} at {torrent_s3_key}, skipping")
+            torrent_exists = True
         except ClientError as e:
             if e.response['Error']['Code'] != '404':
                 logger.error(f"Error checking if torrent exists: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
                 continue
+                
+        if not torrent_exists:
+            try:
+                # Check watch folder
+                s3_client.head_object(Bucket=s3_bucket, Key=watch_torrent_s3_key)
+                logger.info(f"Torrent already exists for {s3_key} in watch folder at {watch_torrent_s3_key}, skipping")
+                torrent_exists = True
+            except ClientError as e:
+                if e.response['Error']['Code'] != '404':
+                    logger.error(f"Error checking if torrent exists in watch folder: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+                    continue
+        
+        if torrent_exists:
+            continue
         
         job_id = f"s3-torrent-{int(time.time())}-{os.path.basename(s3_key)}"
         
@@ -227,15 +274,17 @@ def lambda_handler(event, context):
             
             # Upload torrent back to S3
             update_job_status(job_id, "UPLOADING_TORRENT")
-            logger.info(f"Uploading torrent to S3: {torrent_s3_key}")
+            
+            # Store torrent in the "watch" subfolder
+            logger.info(f"Uploading torrent to S3 watch folder: {watch_torrent_s3_key}")
             
             try:
                 # Check one more time if torrent already exists (race condition check)
                 try:
-                    s3_client.head_object(Bucket=s3_bucket, Key=torrent_s3_key)
+                    s3_client.head_object(Bucket=s3_bucket, Key=watch_torrent_s3_key)
                     logger.info(f"Torrent now exists for {s3_key} (created by another process), skipping upload")
                     update_job_status(job_id, "COMPLETED", {
-                        "torrent_s3_key": torrent_s3_key,
+                        "torrent_s3_key": watch_torrent_s3_key,
                         "original_s3_key": s3_key,
                         "note": "Torrent already exists, skipped upload"
                     })
@@ -248,7 +297,7 @@ def lambda_handler(event, context):
                         continue
                 
                 # Upload the torrent file
-                s3_client.upload_file(torrent_path, s3_bucket, torrent_s3_key)
+                s3_client.upload_file(torrent_path, s3_bucket, watch_torrent_s3_key)
             except ClientError as e:
                 error_msg = f"S3 upload error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
                 logger.error(error_msg)
@@ -257,7 +306,7 @@ def lambda_handler(event, context):
             
             # Success
             update_job_status(job_id, "COMPLETED", {
-                "torrent_s3_key": torrent_s3_key,
+                "torrent_s3_key": watch_torrent_s3_key,
                 "original_s3_key": s3_key
             })
             logger.info(f"Successfully created and uploaded torrent for {s3_key}")

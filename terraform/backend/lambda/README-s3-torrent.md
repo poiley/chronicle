@@ -28,14 +28,43 @@ The Lambda layer contains the `transmission-create` binary and its dependencies.
 
 4. After uploading, note the ARN of the layer and update the Terraform configuration.
 
+## Tracker Configuration
+
+The system is configured to use your own BitTorrent tracker (opentracker) instead of public trackers. This is controlled in several places:
+
+1. **Dynamic IP Configuration**: Use the `util/track-ip-config.sh` script to automatically configure all components with the actual public IP of your opentracker instance
+2. **Configuration File**: `terraform/backend/lambda/tracker-config.json` contains the tracker URL
+3. **Lambda Environment**: The `TRACKERS` environment variable is set in Terraform and LocalStack setup
+4. **ECS Entrypoint**: Used in the transmission-create command in entrypoint.sh script
+
+To update the tracker configuration:
+
+1. Start your opentracker instance
+2. Run the configuration script:
+   ```bash
+   chmod +x util/track-ip-config.sh
+   ./util/track-ip-config.sh
+   ```
+3. This will automatically detect your opentracker's public IP and update all configuration files
+
+For manual configuration, update:
+- `tracker-config.json` - Contains primary tracker URL
+- The `--environment` parameter in `docker/localstack/s3-torrent-lambda-setup.sh`
+- The `transmission-create` command in `docker/ecs/entrypoint.sh`
+- The `TRACKERS` variable in `terraform/backend/s3-torrent-lambda.tf`
+
+IMPORTANT: Never use public trackers as these would expose your files publicly. Always use your own opentracker instance.
+
 ## Lambda Function
 
 The Lambda function is triggered by S3 `ObjectCreated` events. When triggered, it:
 
 1. Downloads the S3 object to a temporary location
 2. Creates a torrent file using `transmission-create`
-3. Uploads the torrent file back to S3 with the original key + `.torrent` extension
+3. Uploads the torrent file to a "watch" subfolder in S3 (key format: `watch/filename.ext.torrent`)
 4. Updates status in DynamoDB
+
+The "watch" folder is a dedicated location in the S3 bucket used to store torrent files, making it easier for downstream processing (like Transmission) to find and use them.
 
 ## Development and Testing
 
@@ -97,6 +126,8 @@ The following improvements have been made to the system:
 
 4. **Race Condition Handling**: Added extra checks to avoid issues when multiple processes try to create the same torrent.
 
+5. **Custom Tracker Support**: Updated to use your own opentracker instance rather than public trackers.
+
 ## Two Torrent Creation Paths
 
 The system now has two ways to create torrents:
@@ -113,4 +144,5 @@ Common issues:
 3. **Lambda timeout**: If processing large files, increase the Lambda timeout and memory allocation.
 4. **Missing S3 notifications**: Verify that the S3 bucket notifications are properly configured.
 5. **LocalStack connectivity**: If the Lambda can't connect to LocalStack, check that the Docker network IP is correctly detected.
-6. **Resource conflicts**: If you see errors about resources already existing, the script should handle this gracefully now. If issues persist, manually clean up resources before retrying. 
+6. **Resource conflicts**: If you see errors about resources already existing, the script should handle this gracefully now. If issues persist, manually clean up resources before retrying.
+7. **Tracker connectivity**: Ensure your opentracker instance is accessible from both the Lambda function and the ECS task. 

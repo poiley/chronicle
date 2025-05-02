@@ -28,6 +28,15 @@ else
   echo "LocalStack is already running."
 fi
 
+# Configure tracker with actual IP
+if [ -f "./util/track-ip-config.sh" ]; then
+  echo "Configuring tracker IP..."
+  chmod +x ./util/track-ip-config.sh
+  ./util/track-ip-config.sh
+else
+  echo "Tracker IP configuration script not found"
+fi
+
 # Start web container connected to LocalStack
 echo "Starting web container..."
 ./util/build_web_docker.sh dev run-localstack
