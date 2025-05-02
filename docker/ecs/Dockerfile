@@ -5,10 +5,10 @@ FROM python:3.11-slim
 ENV AWS_REGION="us-west-1"
 ENV AWS_DEFAULT_REGION="us-west-1"
 
-# Install ffmpeg, curl, unzip
+# Install ffmpeg, curl, unzip and transmission-cli
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       ffmpeg curl unzip \
+       ffmpeg curl unzip transmission-cli docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI

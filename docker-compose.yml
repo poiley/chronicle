@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: chronicle-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,s3,sqs,lambda,apigateway
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - PERSISTENCE=1
+      - TMPDIR=/tmp/localstack
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./tmp/localstack:/tmp/localstack"
+    networks:
+      - chronicle-network
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      target: development
+    container_name: chronicle-web
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./web:/app"
+      - "/app/node_modules"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:4566
+      - NEXT_PUBLIC_S3_URL=http://localhost:4566/chronicle-recordings-dev
+    depends_on:
+      - localstack
+    networks:
+      - chronicle-network
+
+  recorder:
+    build:
+      context: ./docker/ecs
+      dockerfile: Dockerfile
+    container_name: chronicle-recorder
+    volumes:
+      - "downloads-data:/downloads"
+    networks:
+      - chronicle-network
+
+  transmission:
+    build:
+      context: ./docker/transmission
+      dockerfile: Dockerfile
+    container_name: chronicle-transmission
+    ports:
+      - "9091:9091"
+      - "51001:51413"
+      - "51001:51413/udp"
+    volumes:
+      - "downloads-data:/downloads"
+      - "watch-data:/watch"
+      - "config-data:/config"
+    networks:
+      - chronicle-network
+
+networks:
+  chronicle-network:
+    driver: bridge
+
+volumes:
+  downloads-data:
+  watch-data: 
+  config-data: 

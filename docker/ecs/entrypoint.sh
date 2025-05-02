@@ -110,7 +110,61 @@ ddb_update UPLOADING \
 
 $AWS_CLI s3 cp "$TARGET" "s3://$S3_BUCKET/$S3_KEY/" 2>>"$LOGFILE"
 
-# 6) COMPLETED
+# 6) CREATING TORRENT
+ddb_update CREATING_TORRENT \
+  ", creatingTorrentAt = :cta" \
+  '":cta":{"S":"'"$(TIMESTAMP)"'"}'
+
+# Get the full S3 path of the uploaded file
+S3_FULL_PATH="s3://$S3_BUCKET/$S3_KEY/$(basename "$TARGET")"
+TORRENT_FILE="/tmp/$(basename "$TARGET").torrent"
+TORRENT_S3_KEY="$S3_KEY/$(basename "$TARGET").torrent"
+
+# Create torrent file with transmission-create
+transmission-create -o "$TORRENT_FILE" -c "Chronicle Livestream Recording" -t udp://tracker.opentrackr.org:1337 "$TARGET"
+
+# Upload torrent file to S3
+$AWS_CLI s3 cp "$TORRENT_FILE" "s3://$S3_BUCKET/$TORRENT_S3_KEY" 2>>"$LOGFILE"
+
+# Start transmission container to seed the torrent (if we're in LocalStack)
+if [[ -n "${AWS_ENDPOINT_URL:-}" ]]; then
+  # For local development, we can use Docker directly
+  docker run -d \
+    --name "transmission-${JOB_ID}" \
+    --network="localstack_default" \
+    --volumes-from chronicle-recorder \
+    --volumes-from chronicle-transmission \
+    -e "JOB_ID=$JOB_ID" \
+    -e "DDB_TABLE=$DDB_TABLE" \
+    -e "TORRENT_FILE=$TORRENT_FILE" \
+    -e "SOURCE_FILE=$TARGET" \
+    -e "S3_BUCKET=$S3_BUCKET" \
+    -e "S3_KEY=$TORRENT_S3_KEY" \
+    -e "AWS_ENDPOINT_URL=$AWS_ENDPOINT_URL" \
+    chronicle-transmission
+else
+  # For production, we use ECS task
+  aws ecs run-task \
+    --cluster "${ECS_CLUSTER}" \
+    --task-definition "${TRANSMISSION_TASK_DEF}" \
+    --launch-type FARGATE \
+    --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS}],securityGroups=[${SECURITY_GROUP_IDS}],assignPublicIp=ENABLED}" \
+    --overrides "{
+      \"containerOverrides\": [{
+        \"name\": \"chronicle-transmission\",
+        \"environment\": [
+          {\"name\": \"JOB_ID\", \"value\": \"$JOB_ID\"},
+          {\"name\": \"DDB_TABLE\", \"value\": \"$DDB_TABLE\"},
+          {\"name\": \"TORRENT_FILE\", \"value\": \"$TORRENT_FILE\"},
+          {\"name\": \"SOURCE_FILE\", \"value\": \"$TARGET\"},
+          {\"name\": \"S3_BUCKET\", \"value\": \"$S3_BUCKET\"},
+          {\"name\": \"S3_KEY\", \"value\": \"$TORRENT_S3_KEY\"}
+        ]
+      }]
+    }"
+fi
+
+# 7) Update DynamoDB with torrent info
 ddb_update COMPLETED \
-  ", finishedAt = :ft" \
-  '":ft":{"S":"'"$(TIMESTAMP)"'"}'
+  ", finishedAt = :ft, torrentFile = :tf" \
+  '":ft":{"S":"'"$(TIMESTAMP)"'"},":tf":{"S":"'"$TORRENT_S3_KEY"'"}'

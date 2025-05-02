@@ -51,6 +51,22 @@ resource "aws_ecs_task_definition" "recorder" {
         {
           name  = "TTL_DAYS"
           value = "30"
+        },
+        {
+          name  = "TRANSMISSION_TASK_DEF"
+          value = aws_ecs_task_definition.transmission.arn
+        },
+        {
+          name  = "ECS_CLUSTER"
+          value = aws_ecs_cluster.this.name
+        },
+        {
+          name  = "SUBNET_IDS"
+          value = join(",", aws_public_subnet.public[*].id)
+        },
+        {
+          name  = "SECURITY_GROUP_IDS"
+          value = aws_security_group.ecs_tasks.id
         }
       ]
 

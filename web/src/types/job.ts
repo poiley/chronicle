@@ -3,6 +3,8 @@ export type JobStatus =
   | "STARTED"
   | "RECORDING"
   | "UPLOADING"
+  | "CREATING_TORRENT"
+  | "SEEDING"
   | "COMPLETED"
   | "FAILED";
 
@@ -18,9 +20,13 @@ export interface Job {
   lastHeartbeat?:   string;
   bytesDownloaded?: number;
   uploadingAt?:     string;
+  creatingTorrentAt?: string;
+  seedingStartedAt?: string;
   finishedAt?:      string;
   errorDetail?:     string;
   errorMessage?:    string;
   progress?:        number;  // Percentage of download/recording progress
   size?:            number;  // Size in bytes
+  torrentFile?:     string;  // S3 key for the torrent file
+  torrentInfo?:     string;  // Information about the torrent
 }

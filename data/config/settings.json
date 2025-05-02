@@ -1,0 +1,1 @@
+{"peer-port": 50000, "peer-port-random-on-start": false, "rpc-whitelist": "*", "rpc-whitelist-enabled": false, "bind-address-ipv4": "0.0.0.0"}

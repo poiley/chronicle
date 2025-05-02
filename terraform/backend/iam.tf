@@ -74,7 +74,7 @@ data "aws_iam_policy_document" "lambda_sqs" {
       "sqs:DeleteMessage",
       "sqs:GetQueueAttributes"
     ]
-    resources = [ aws_sqs_queue.yt_jobs.arn ]
+    resources = [ aws_sqs_queue.chronicle_jobs.arn ]
   }
 }
 
@@ -134,4 +134,26 @@ resource "aws_iam_role_policy" "ecs_ddb_policy" {
   name   = "EcsTaskDDBAccess"
   role   = aws_iam_role.ecs_task_role.id
   policy = data.aws_iam_policy_document.ecs_ddb.json
+}
+
+# --- ECS task needs to run other ECS tasks (for torrent seeding) ---
+data "aws_iam_policy_document" "ecs_runtask" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "ecs:RunTask",
+      "iam:PassRole"
+    ]
+    resources = [
+      aws_ecs_task_definition.transmission.arn,
+      aws_iam_role.ecs_exec_role.arn,
+      aws_iam_role.ecs_task_role.arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "ecs_runtask_policy" {
+  name   = "EcsTaskRunTaskAccess"
+  role   = aws_iam_role.ecs_task_role.id
+  policy = data.aws_iam_policy_document.ecs_runtask.json
 }

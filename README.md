@@ -6,7 +6,8 @@ A turnkey, serverless system for on-demand recording of livestreams. Submit a li
 2. Dispatch a Lambda → ECS Fargate task to record in highest quality (`yt-dlp`).  
 3. Track real-time progress and heartbeats in DynamoDB.  
 4. Upload the final `.mkv` into S3.  
-5. Serve a React/Tailwind/shadcn dashboard (OLED dark + olive accent) via CloudFront.
+5. Create a torrent file and seed it through transmission for P2P sharing.
+6. Serve a React/Tailwind/shadcn dashboard (OLED dark + olive accent) via CloudFront.
 
 ---
 
@@ -312,5 +313,37 @@ The project includes several utility scripts to simplify common development and 
   ./util/dl-strm.sh "https://www.youtube.com/watch?v=LIVE_ID"
   ```
   Useful for testing stream recording without using the full AWS infrastructure.
+
+---
+
+## P2P Distribution with BitTorrent
+
+Chronicle now supports peer-to-peer distribution of recorded content using BitTorrent:
+
+1. After a recording is completed and uploaded to S3, the system automatically:
+   - Creates a torrent file for the recording
+   - Launches a transmission container to seed the torrent
+   - Updates the job record with torrent information
+   - Provides the torrent file for download in the web UI
+
+2. **Benefits of the BitTorrent approach:**
+   - Reduces bandwidth costs for S3 downloads
+   - Provides a more reliable downloading experience for users
+   - Allows for persistent access to content even after S3 files expire
+   - Creates a distributed network of seeders if users continue to seed
+
+3. **How it works:**
+   - The recording container creates a torrent file with `transmission-create`
+   - The torrent file is uploaded to S3
+   - A dedicated transmission container is started to seed the content
+   - Users can download either directly from S3 or via the torrent file
+   - After S3 files expire, content remains available via the P2P network
+
+4. **Resource management:**
+   - Transmission containers are configured with resource limits
+   - EFS storage is used for persistent seeding across container restarts
+   - TTL settings ensure containers are terminated after sufficient seeding time
+
+To use this feature, simply download the torrent file from the job details view and open it in your BitTorrent client.
 
 ---

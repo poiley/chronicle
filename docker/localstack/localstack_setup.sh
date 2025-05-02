@@ -120,8 +120,19 @@ else
     --role arn:aws:iam::000000000000:role/irrelevant \
     --zip-file fileb://"$LAMBDA_ZIP" \
     --timeout 300 \
-    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=chronicle-recorder-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=chronicle-recorder,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30}"
+    --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_TASK_DEF=chronicle-recorder-task,S3_BUCKET=$S3_BUCKET,DDB_TABLE=$DDB_TABLE,CONTAINER_NAME=chronicle-recorder,SUBNET_IDS=,SECURITY_GROUP_IDS=,TTL_DAYS=30,TRANSMISSION_TASK_DEF=chronicle-transmission-task}"
 fi
+
+# 5.1) Create transmission ECS task definition
+echo "➜ Creating transmission ECS task definition"
+$AWS_CLI ecs register-task-definition \
+  --family chronicle-transmission-task \
+  --container-definitions '[{
+    "name": "chronicle-transmission",
+    "image": "chronicle-transmission:latest",
+    "essential": true,
+    "environment": []
+  }]'
 
 # 6) API Gateway
 echo "➜ Creating API Gateway REST API: $API_NAME"

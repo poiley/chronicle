@@ -18,11 +18,12 @@ resource "aws_lambda_function" "dispatch" {
   environment {
     variables = {
       # ECS & S3 settings
-      ECS_CLUSTER    = aws_ecs_cluster.this.name
-      ECS_TASK_DEF   = aws_ecs_task_definition.recorder.arn
-      S3_BUCKET      = aws_s3_bucket.streams.bucket
-      CONTAINER_NAME = var.container_name
-      DDB_TABLE      = aws_dynamodb_table.jobs.name
+      ECS_CLUSTER        = aws_ecs_cluster.this.name
+      ECS_TASK_DEF       = aws_ecs_task_definition.recorder.arn
+      TRANSMISSION_TASK_DEF = aws_ecs_task_definition.transmission.arn
+      S3_BUCKET          = aws_s3_bucket.streams.bucket
+      CONTAINER_NAME     = var.container_name
+      DDB_TABLE          = aws_dynamodb_table.jobs.name
 
       # VPC networking for Fargate
       SUBNET_IDS         = join(",", aws_public_subnet.public[*].id)

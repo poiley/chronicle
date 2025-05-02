@@ -9,23 +9,20 @@ type JobCardProps = {
   onClick: (jobId: string) => void;
 };
 
-const statusColor = (status: Job["status"]) => {
-  switch (status) {
-    case "PENDING":
-      return "gray";
-    case "STARTED":
-      return "blue";
-    case "RECORDING":
-      return "green";
-    case "UPLOADING":
-      return "yellow";
-    case "COMPLETED":
-      return "olive";
-    case "FAILED":
-      return "red";
-    default:
-      return "gray";
-  }
+// Get badge style based on status
+const getBadgeStyle = (status: Job["status"]) => {
+  const colorMapping = {
+    "PENDING": "bg-gray-500",
+    "STARTED": "bg-blue-500",
+    "RECORDING": "bg-green-500",
+    "UPLOADING": "bg-yellow-500",
+    "CREATING_TORRENT": "bg-purple-500",
+    "SEEDING": "bg-amber-500",
+    "COMPLETED": "bg-emerald-500",
+    "FAILED": "bg-red-500"
+  };
+  
+  return colorMapping[status] || "bg-gray-500";
 };
 
 export function JobCard({ job, onClick }: JobCardProps) {
@@ -36,7 +33,7 @@ export function JobCard({ job, onClick }: JobCardProps) {
     >
       <CardHeader className="flex justify-between items-center">
         <CardTitle className="truncate">{job.filename}</CardTitle>
-        <Badge variant={statusColor(job.status)}>
+        <Badge variant="outline" className={getBadgeStyle(job.status)}>
           {job.status}
         </Badge>
       </CardHeader>
@@ -50,6 +47,11 @@ export function JobCard({ job, onClick }: JobCardProps) {
         {job.bytesDownloaded != null && (
           <p className="text-xs text-muted-foreground">
             Downloaded: {job.bytesDownloaded.toLocaleString()} bytes
+          </p>
+        )}
+        {job.torrentFile && (
+          <p className="text-xs text-muted-foreground">
+            Torrent available
           </p>
         )}
         <div className="text-right">
