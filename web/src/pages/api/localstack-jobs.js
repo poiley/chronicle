@@ -7,7 +7,7 @@ const awsConfig = {
   secretAccessKey: 'test',
   endpoint: process.env.NODE_ENV === 'production' 
     ? undefined 
-    : 'http://localstack:4566'
+    : 'http://chronicle-localstack:4566'
 };
 
 // Handler for API routes
