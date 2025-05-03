@@ -49,7 +49,7 @@ To update the tracker configuration:
 
 For manual configuration, update:
 - `tracker-config.json` - Contains primary tracker URL
-- The `--environment` parameter in `docker/localstack/s3-torrent-lambda-setup.sh`
+- The `--environment` parameter in `docker/localstack/torrent_lambda_setup.sh`
 - The `transmission-create` command in `docker/ecs/entrypoint.sh`
 - The `TRACKERS` variable in `terraform/backend/s3-torrent-lambda.tf`
 
@@ -72,7 +72,7 @@ For local testing:
 
 1. Use the improved LocalStack setup script that handles resource conflicts and Docker networking:
    ```bash
-   docker/localstack/s3-torrent-lambda-setup.sh
+   docker/localstack/torrent_lambda_setup.sh
    ```
 
 2. Or use the full rebuild script that gracefully handles errors:

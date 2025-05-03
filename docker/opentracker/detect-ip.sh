@@ -39,4 +39,4 @@ get_ip() {
 # Get the IP and store it in a file
 IP=$(get_ip)
 echo "$IP" > /tmp/public-ip
-echo "Detected public IP: $IP" 
+echo "$IP" 

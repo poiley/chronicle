@@ -140,12 +140,26 @@ else
   echo "Lambda function created successfully!"
 fi
 
-# Clear any existing S3 notification configurations
-echo "Clearing existing S3 notification configurations..."
-aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager s3api put-bucket-notification-configuration \
-  --bucket "$BUCKET_NAME" \
-  --notification-configuration '{}' || echo "Failed to clear S3 notifications, but continuing"
+# Add permission for S3 to invoke Lambda
+echo "Adding permission for S3 to invoke Lambda..."
+PERMISSION_RESULT=0
+aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager lambda add-permission \
+  --function-name "$LAMBDA_NAME" \
+  --statement-id "s3-permission" \
+  --action "lambda:InvokeFunction" \
+  --principal "s3.amazonaws.com" \
+  --source-arn "arn:aws:s3:::$BUCKET_NAME" || PERMISSION_RESULT=1
 
+if [ $PERMISSION_RESULT -ne 0 ]; then
+  echo "WARNING: Lambda permission setup had issues, S3 may not be able to invoke Lambda"
+else
+  echo "Lambda permission configured successfully!"
+fi
+
+# Wait a moment for permissions to propagate
+sleep 5
+
+# Now set the S3 notification
 echo "Configuring S3 trigger for Lambda..."
 S3_TRIGGER_RESULT=0
 aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager s3api put-bucket-notification-configuration \
@@ -172,22 +186,6 @@ if aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" lambda get-polic
   aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager lambda remove-permission \
     --function-name "$LAMBDA_NAME" \
     --statement-id "s3-permission" || echo "Failed to remove existing permission, but continuing"
-fi
-
-# Add permission for S3 to invoke Lambda
-echo "Adding permission for S3 to invoke Lambda..."
-PERMISSION_RESULT=0
-aws --endpoint-url="$LOCALSTACK_ENDPOINT" --region="$REGION" --no-cli-pager lambda add-permission \
-  --function-name "$LAMBDA_NAME" \
-  --statement-id "s3-permission" \
-  --action "lambda:InvokeFunction" \
-  --principal "s3.amazonaws.com" \
-  --source-arn "arn:aws:s3:::$BUCKET_NAME" || PERMISSION_RESULT=1
-
-if [ $PERMISSION_RESULT -ne 0 ]; then
-  echo "WARNING: Lambda permission setup had issues, S3 may not be able to invoke Lambda"
-else
-  echo "Lambda permission configured successfully!"
 fi
 
 # Cleanup

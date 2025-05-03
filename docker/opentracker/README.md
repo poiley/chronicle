@@ -17,7 +17,7 @@ We implemented a dynamic IP detection and configuration mechanism:
 ## Components Modified
 
 - Created `util/track-ip-config.sh` - Main script to detect and configure tracker IP
-- Updated `docker/localstack/s3-torrent-lambda-setup.sh` - Added dynamic IP detection
+- Updated `docker/localstack/torrent_lambda_setup.sh` - Added dynamic IP detection
 - Updated `util/rebuild_images_no_cache.sh` - Added tracker IP configuration step
 - Updated `util/start_development.sh` - Added tracker IP configuration step
 - Updated documentation in `terraform/backend/lambda/README-s3-torrent.md`

@@ -16,6 +16,9 @@ OPENTRACKER_CONTAINER="chronicle-opentracker"
 S3_BUCKET="chronicle-recordings-dev"
 DDB_TABLE="jobs"
 
+# Save the root directory
+ROOT_DIR="$(pwd)"
+
 echo "====================================================="
 echo "🚀 Setting up Chronicle development environment"
 echo "====================================================="
@@ -68,20 +71,43 @@ docker network rm "$NETWORK_NAME" 2>/dev/null || true
 echo "🔄 Creating Docker network $NETWORK_NAME..."
 docker network create "$NETWORK_NAME"
 
-# Start LocalStack with fresh configuration
+# Build and start opentracker container
+echo "🔄 Building opentracker image with no cache..."
+docker build --no-cache -t chronicle-opentracker:latest -f "$ROOT_DIR/docker/opentracker/Dockerfile" "$ROOT_DIR/docker/opentracker"
+
+echo "🔄 Starting opentracker container..."
+docker run -d \
+  --name "$OPENTRACKER_CONTAINER" \
+  --network="$NETWORK_NAME" \
+  --sysctl net.ipv6.conf.all.disable_ipv6=1 \
+  --sysctl net.ipv6.conf.default.disable_ipv6=1 \
+  -p 6969:6969 \
+  -p 6969:6969/udp \
+  chronicle-opentracker:latest
+
+# Wait for opentracker to start before configuring tracker IP
+sleep 5
+
+if [ -f "$ROOT_DIR/util/track-ip-config.sh" ]; then
+  echo "🔄 Configuring tracker IP..."
+  cd "$ROOT_DIR"
+  chmod +x ./util/track-ip-config.sh
+  stdbuf -oL -eL ./util/track-ip-config.sh || true
+else
+  echo "❌ Tracker IP configuration script not found"
+fi
+
+# Build and start opentracker container
+echo "🔄 Building LocalStack image with no cache..."
+docker build --no-cache -t chronicle-localstack:latest -f "$ROOT_DIR/docker/localstack/Dockerfile" "$ROOT_DIR/docker/localstack"
+
 echo "🔄 Starting LocalStack..."
 docker run -d --name "$LOCALSTACK_CONTAINER" \
   --network="$NETWORK_NAME" \
   -p 4566:4566 \
-  -e SERVICES=s3,sqs,dynamodb,lambda,apigateway \
-  -e DEBUG=1 \
-  -e AWS_ACCESS_KEY_ID=test \
-  -e AWS_SECRET_ACCESS_KEY=test \
-  -e AWS_DEFAULT_REGION=us-west-1 \
-  -e LAMBDA_EXECUTOR=docker \
   -v "/var/run/docker.sock:/var/run/docker.sock" \
   -v "localstack_data:/data" \
-  localstack/localstack:latest
+  chronicle-localstack:latest
 
 # Wait for LocalStack to initialize
 echo "🔄 Waiting for LocalStack to be ready..."
@@ -106,38 +132,34 @@ done
 
 # Initialize LocalStack services
 echo "🔄 Initializing LocalStack services..."
+cd "$ROOT_DIR"
 ./docker/localstack/localstack_setup.sh
 
 # Configure CORS for API Gateway
 echo "🔄 Configuring CORS for API Gateway..."
+cd "$ROOT_DIR"
 ./util/fix_localstack_cors.sh
-
-# Configure tracker with actual IP
-if [ -f "./util/track-ip-config.sh" ]; then
-  echo "🔄 Configuring tracker IP..."
-  chmod +x ./util/track-ip-config.sh
-  ./util/track-ip-config.sh
-else
-  echo "❌ Tracker IP configuration script not found"
-fi
 
 # Set up S3 torrent Lambda
 echo "🔄 Setting up S3 torrent Lambda..."
-./docker/localstack/s3-torrent-lambda-setup.sh
+cd "$ROOT_DIR"
+./docker/localstack/torrent_lambda_setup.sh
 
 # Update all Lambda functions to use Docker TCP
 echo "🔄 Configuring Lambda functions to use Docker TCP..."
+cd "$ROOT_DIR"
 ./util/update_lambda_docker_host.sh
 
 # Build recorder and transmission images with no cache
 echo "🔄 Building recorder image with no cache..."
-docker build --no-cache -t chronicle-recorder:latest -f docker/ecs/Dockerfile docker/ecs
+docker build --no-cache -t chronicle-recorder:latest -f "$ROOT_DIR/docker/ecs/Dockerfile" "$ROOT_DIR/docker/ecs"
 
 echo "🔄 Building transmission image with no cache..."
-docker build --no-cache -t chronicle-transmission:latest -f docker/transmission/Dockerfile docker/transmission
+docker build --no-cache -t chronicle-transmission:latest -f "$ROOT_DIR/docker/transmission/Dockerfile" "$ROOT_DIR/docker/transmission"
 
 # Build and start web container with no cache
 echo "🔄 Starting web container..."
+cd "$ROOT_DIR"
 ./util/build_web_docker.sh dev no-cache
 
 # Start transmission container for seeding torrents
@@ -158,17 +180,6 @@ docker run -d \
   -e AWS_SECRET_ACCESS_KEY=test \
   chronicle-transmission:latest
 
-# Build and start opentracker container
-echo "🔄 Building opentracker image with no cache..."
-cd docker/opentracker && docker build --no-cache -t chronicle-opentracker:latest . && cd ../..
-
-echo "🔄 Starting opentracker container..."
-docker run -d \
-  --name "$OPENTRACKER_CONTAINER" \
-  --network="$NETWORK_NAME" \
-  -p 6969:6969 \
-  -p 6969:6969/udp \
-  chronicle-opentracker:latest
 
 # Let the user know we're done
 echo ""
@@ -191,4 +202,6 @@ echo "  ./util/test_e2e_flow.sh <youtube_url> <output_filename>"
 echo ""
 echo "To check and fix job statuses (recommended for LocalStack), run:"
 echo "  ./util/check_and_fix_job_status.sh"
-echo "=====================================================" 
+echo "====================================================="
+# Return to the original directory at the end
+cd "$ROOT_DIR" 

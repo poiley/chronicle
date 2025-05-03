@@ -1,6 +1,6 @@
 FROM alpine:latest as builder
 
-# Install build dependencies
+# Install build dependencies without version pinning
 RUN apk add --no-cache \
     gcc \
     g++ \
@@ -8,43 +8,53 @@ RUN apk add --no-cache \
     git \
     cvs \
     zlib-dev \
-    curl \
-    iproute2
+    curl
+
+# Set working directory
+WORKDIR /build
 
 # Build libowfat
-RUN cvs -d :pserver:cvs@cvs.fefe.de:/cvs -z9 co libowfat \
-    && cd libowfat \
-    && make
+RUN cvs -d :pserver:cvs@cvs.fefe.de:/cvs -z9 co libowfat && \
+    cd libowfat && \
+    make -j$(nproc)
 
-# Build opentracker
-RUN git clone git://erdgeist.org/opentracker \
-    && cd opentracker \
-    && make
+# Build opentracker with IPv4 only and debug enabled
+RUN git clone git://erdgeist.org/opentracker && \
+    cd opentracker && \
+    make -j$(nproc) FEATURES+=-DWANT_V4_ONLY FEATURES+=-DWANT_FULLSCRAPE FEATURES+=-D_DEBUG_HTTPERROR
 
-# Runtime stage
+# Simple runtime stage - minimal image
 FROM alpine:latest
 
-# Install runtime dependencies
+# Install runtime dependencies including diagnostic tools
 RUN apk add --no-cache \
     curl \
-    iproute2
+    iproute2 \
+    tzdata \
+    bash \
+    coreutils \
+    net-tools \
+    procps \
+    strace \
+    tcpdump
 
-# Copy built binaries and scripts
-COPY --from=builder /opentracker/opentracker /usr/local/bin/
-COPY --from=builder /libowfat/libowfat.a /usr/local/lib/
-COPY detect-ip.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/detect-ip.sh
+# Set timezone to UTC for consistent logging
+ENV TZ=UTC
 
-# Create entrypoint script
-RUN echo '#!/bin/sh\n\
-echo "Detecting public IP..."\n\
-IP=$(/usr/local/bin/detect-ip.sh)\n\
-echo "Detected public IP: $IP"\n\
-echo "Starting tracker on $IP:6969"\n\
-exec /usr/local/bin/opentracker -i "$IP" -p 6969 -P 6969' > /entrypoint.sh \
-    && chmod +x /entrypoint.sh
+# Copy the binary from the builder
+COPY --from=builder /build/opentracker/opentracker /usr/local/bin/
+COPY detect-ip.sh /usr/local/bin/detect-ip
+COPY entrypoint.sh /entrypoint.sh
 
-EXPOSE 6969
+# Set permissions
+RUN chmod +x /usr/local/bin/detect-ip /entrypoint.sh
+
+# Create a directory for logs
+RUN mkdir -p /var/log/opentracker
+
+# Expose TCP and UDP ports
+EXPOSE 6969/tcp
 EXPOSE 6969/udp
 
+# Define entrypoint
 ENTRYPOINT ["/entrypoint.sh"] 

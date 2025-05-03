@@ -25,7 +25,7 @@ This directory contains the LocalStack setup for local development and testing. 
 
 3. Set up the S3 torrent creation feature:
    ```bash
-   ./s3-torrent-lambda-setup.sh
+   ./torrent_lambda_setup.sh
    ```
 
 ## Configuration
@@ -57,7 +57,7 @@ Sets up the core infrastructure:
 5. Configures API Gateway endpoints
 6. Sets up CORS
 
-### s3-torrent-lambda-setup.sh
+### torrent_lambda_setup.sh
 
 Configures the torrent creation system:
 1. Creates S3 bucket if not exists

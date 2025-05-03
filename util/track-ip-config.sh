@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
+trap 'echo "track-ip-config.sh failed at line $LINENO with exit code $?" >&2' ERR
 
+echo "track-ip-config.sh: starting"
 # Script to configure the opentracker's IP in all relevant files
 
 # Use the opentracker container name from setup_fixed.sh
@@ -58,7 +60,7 @@ EOF
 
 # Update Lambda environment in LocalStack setup
 update_lambda_env() {
-  SETUP_SCRIPT="docker/localstack/s3-torrent-lambda-setup.sh"
+  SETUP_SCRIPT="docker/localstack/torrent_lambda_setup.sh"
   if [ -f "$SETUP_SCRIPT" ]; then
     echo "Updating $SETUP_SCRIPT..."
     sed -i "s|TRACKERS=udp://[^:]*:[0-9]*|TRACKERS=${TRACKER_URL}|g" "$SETUP_SCRIPT"
